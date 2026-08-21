@@ -8,7 +8,7 @@
 
 ## 「七政」释义
 
-出典：《尚书·舜典》「璇玑玉衡，以齐七政」。通常**七政**指**日、月**与**金、木、水、火、土**五星。本站以此为名，做轨道与历法对照，供观象与学习。
+出典：《尚书·舜典》「璇玑玉衡，以齐七政」。通常**七政**指**日、月**与**金、木、水、火、土**五星。本站以此为名，做轨道与历法对照，供观象与学习。资料与依赖详见下方 [出处](#出处--资料来源)。
 
 ## 本地运行
 
@@ -69,7 +69,43 @@ Dashboard 新建 Pages 项目 → 连接仓库 → 填上表 Build command / Out
 
 本项目以 **MIT License** 完全开源，见根目录 [`LICENSE`](./LICENSE)。欢迎使用、修改与再分发。
 
-## 参考
+## 出处 / 资料来源
 
-- [余钊焕·星图](https://yzhxxzxy.github.io/cn/starcharts.html)：三垣二十八宿等名表/连线人工对照用，非可编程数据源。
-- [Celestial Dial · 星盘年月日](https://lab.est.im/celestial_dial/)：历象/授时交互示意参考，非星官名表校对源。
+教学向示意站点：算法与星象为**近似 / 示意**，非官方历书、非观测星表、非精密星历。
+
+### 名称出典
+
+- 《尚书·舜典》「璇玑玉衡，以齐七政」——见上文「七政」释义。
+
+### 开源依赖
+
+| 项 | 说明 |
+| --- | --- |
+| [Vue 3](https://vuejs.org/) · [Vue Router](https://router.vuejs.org/) · [Vite](https://vitejs.dev/) | 前端框架与构建 |
+| [Three.js](https://threejs.org/) | 三维场景（MIT） |
+
+### 天体贴图
+
+- 日 / 地 / 月 / 行星等球面贴图来自 [Solar System Scope · Textures](https://www.solarsystemscope.com/textures/)，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。
+- 本地缓存于 `public/textures/`，仅供本站渲染。
+
+### 历法与轨道算法
+
+- **节气**：太阳视黄经定气（教学近似）。
+- **朔望 / 农历**：参考 Meeus 等公开公式的示意实现（含无中气置闰），非国家授时 / 民用历书。
+- **道历年数**：`西元 + 2697`（以公元前 2697 甲子为元年的常见换算口径）。
+- **三维轨道**：半径为教学压缩尺度；行星方位为日心黄经近似，与历法 JD 联动，非精密星历。
+
+### 星象数据
+
+- **西象**：IAU 88 星座示意折线（便于同屏辨认）。
+- **古象·纲 / 繁**：三垣·二十八宿·北斗等 core 为示意折线；繁表坐标源自 [d3-celestial](https://github.com/ofrohn/d3-celestial) / Stellarium 中国星空文化整理，示意坐标，非观测星表。
+- 名表人工对照：[余钊焕·星图](https://yzhxxzxy.github.io/cn/starcharts.html)（非可编程数据源）。
+
+### 交互与历象参考
+
+- [Celestial Dial · 星盘年月日](https://lab.est.im/celestial_dial/)：历象 / 授时交互示意参考，非星官名表校对源。
+
+### 字体
+
+Noto Sans / Serif SC、JetBrains Mono 本地子集，见 `public/fonts/`（已不依赖 Google Fonts CDN）。
