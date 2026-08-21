@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="七政">
+  <rect width="64" height="64" rx="10" fill="#050a12"/>
+  <rect x="1.2" y="1.2" width="61.6" height="61.6" rx="9" fill="none" stroke="#3d6a6c" stroke-width="1.2" opacity="0.55"/>
+  <!-- 轨：加粗加亮，小尺寸可辨 -->
+  <circle cx="32" cy="32" r="20.5" fill="none" stroke="#8ec4c2" stroke-width="2.4"/>
+  <!-- 五星：偏暖亮点，与轨拉开 -->
+  <g fill="#e8d9a8">
+    <circle cx="51.6" cy="24.2" r="2.15"/>
+    <circle cx="52.2" cy="38.1" r="2"/>
+    <circle cx="45.5" cy="49.2" r="2.05"/>
+    <circle cx="33.6" cy="54.1" r="1.95"/>
+    <circle cx="22.2" cy="51.8" r="2"/>
+  </g>
+  <!-- 日：大块淡金，一眼可辨 -->
+  <circle cx="44.8" cy="13.6" r="7.2" fill="#e2b84f"/>
+  <circle cx="42.6" cy="11.6" r="2.2" fill="#fff6d6" opacity="0.55"/>
+  <!-- 月：浅石青新月，对比日金 -->
+  <path fill="#b8e0dc" d="M12.4 41.2a6.6 6.6 0 1 0 6.5 10.4 5.15 5.15 0 1 1-6.5-10.4z"/>
+</svg>

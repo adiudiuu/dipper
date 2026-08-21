@@ -1,0 +1,238 @@
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  constellationMode: { type: String, required: true },
+  eastLabels: { type: Boolean, required: true },
+  dateValue: { type: String, required: true },
+  skyModes: { type: Array, required: true }
+})
+
+const emit = defineEmits([
+  'update:constellationMode',
+  'update:eastLabels',
+  'update:dateValue',
+  'defaults'
+])
+
+const showEastLabelToggle = computed(
+  () => props.constellationMode === 'east' || props.constellationMode === 'all'
+)
+</script>
+
+<template>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="/logo.svg?v=2" width="36" height="36" alt="" aria-hidden="true">
+      <div class="brand-text" title="教学向历象观天，非算命">
+        <h1>七政</h1>
+        <div class="sub">历象 · 授时 · 节气</div>
+      </div>
+    </div>
+    <div class="actions">
+      <div class="sky-mode" role="group" aria-label="星象层">
+        <button
+          v-for="m in skyModes"
+          :key="m.id"
+          type="button"
+          class="sky-mode-btn"
+          :class="{ active: constellationMode === m.id }"
+          :aria-pressed="constellationMode === m.id"
+          @click="emit('update:constellationMode', m.id)"
+        >{{ m.label }}</button>
+      </div>
+      <div
+        v-if="showEastLabelToggle"
+        class="sky-mode sky-mode-labels"
+        role="group"
+        aria-label="古象贴名"
+      >
+        <button
+          type="button"
+          class="sky-mode-btn"
+          :class="{ active: eastLabels }"
+          :aria-pressed="eastLabels"
+          @click="emit('update:eastLabels', true)"
+        >显名</button>
+        <button
+          type="button"
+          class="sky-mode-btn"
+          :class="{ active: !eastLabels }"
+          :aria-pressed="!eastLabels"
+          @click="emit('update:eastLabels', false)"
+        >隐名</button>
+      </div>
+      <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
+      <label class="date-wrap" title="跳转到指定公历日期">
+        <input
+          :value="dateValue"
+          type="date"
+          aria-label="选择公历日期"
+          @input="emit('update:dateValue', $event.target.value)"
+        >
+      </label>
+    </div>
+  </header>
+</template>
+
+<style scoped>
+.topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.5rem 0.65rem;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 14, 22, 0.88) 0%,
+    rgba(8, 14, 22, 0.32) 60%,
+    rgba(8, 14, 22, 0) 100%
+  );
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  min-width: 0;
+}
+
+.brand-logo {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.42rem;
+  box-shadow: 0 0 0 1px rgba(90, 138, 140, 0.22);
+}
+
+.brand-text {
+  min-width: 0;
+}
+
+.brand h1 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 1.28rem;
+  letter-spacing: 0.2em;
+  color: var(--xuan-zhi);
+  line-height: 1.2;
+}
+
+.brand .sub {
+  margin-top: 0.22rem;
+  font-size: 0.68rem;
+  color: var(--xuan-zhi-mute);
+  letter-spacing: 0.12em;
+}
+
+.actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 2.55rem;
+}
+
+.sky-mode {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgba(90, 138, 140, 0.22);
+  background: rgba(14, 22, 32, 0.55);
+  height: 2.05rem;
+}
+
+.sky-mode-btn {
+  appearance: none;
+  border: none;
+  border-right: 1px solid rgba(90, 138, 140, 0.16);
+  background: transparent;
+  color: rgba(233, 228, 214, 0.55);
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  padding: 0 0.55rem 0 0.68rem;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+
+.sky-mode-btn:last-child {
+  border-right: none;
+}
+
+.sky-mode-btn:hover {
+  color: rgba(233, 228, 214, 0.88);
+  background: rgba(90, 138, 140, 0.08);
+}
+
+.sky-mode-btn.active {
+  color: var(--dan-jin);
+  background: rgba(184, 150, 74, 0.1);
+}
+
+.sky-mode-labels {
+  margin-left: 0.15rem;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid rgba(90, 138, 140, 0.28);
+  background: rgba(14, 22, 32, 0.72);
+  color: var(--xuan-zhi-dim);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  padding: 0.42rem 0.9rem;
+  height: 2.05rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.btn:hover {
+  border-color: rgba(184, 150, 74, 0.55);
+  color: var(--dan-jin);
+  background: rgba(184, 150, 74, 0.06);
+}
+
+.date-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.date-wrap input[type='date'] {
+  appearance: none;
+  border: 1px solid rgba(90, 138, 140, 0.28);
+  background: rgba(14, 22, 32, 0.72);
+  color: var(--xuan-zhi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.38rem 0.6rem;
+  height: 2.05rem;
+  color-scheme: dark;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.date-wrap input[type='date']:hover {
+  border-color: rgba(90, 138, 140, 0.5);
+}
+
+.date-wrap input[type='date']:focus {
+  outline: none;
+  border-color: var(--shi-qing);
+  color: var(--xuan-zhi);
+}
+
+@media (max-width: 720px) {
+  .brand h1 {
+    font-size: 1.1rem;
+  }
+  .actions {
+    min-height: auto;
+  }
+}
+</style>
