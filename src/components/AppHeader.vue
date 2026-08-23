@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 
 const props = defineProps({
   constellationMode: { type: String, required: true },
@@ -77,6 +78,8 @@ const showEastLabelToggle = computed(
           @click="emit('addDays', 1)"
         >›</button>
       </div>
+      <RouterLink to="/butiange" class="nav-link" title="步天歌互动认星">步天歌</RouterLink>
+      <RouterLink to="/timeline" class="nav-link" title="历代天文历法名家">时间线</RouterLink>
       <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
       <label class="date-wrap" title="跳转到指定公历日期">
         <input
@@ -245,6 +248,28 @@ const showEastLabelToggle = computed(
   background: rgba(184, 150, 74, 0.06);
 }
 
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(90, 138, 140, 0.22);
+  background: rgba(14, 22, 32, 0.45);
+  color: rgba(201, 194, 176, 0.58);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  padding: 0.42rem 0.72rem;
+  height: 2.05rem;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.nav-link:hover {
+  border-color: rgba(184, 150, 74, 0.45);
+  color: var(--dan-jin);
+  background: rgba(184, 150, 74, 0.06);
+}
+
 .date-wrap {
   display: inline-flex;
   align-items: center;
@@ -324,7 +349,8 @@ const showEastLabelToggle = computed(
 
   .sky-mode-btn,
   .day-nav-btn,
-  .btn {
+  .btn,
+  .nav-link {
     min-width: var(--tap-min);
     min-height: var(--tap-min);
     height: auto;

@@ -12,8 +12,19 @@ const routes = [
     name: 'home',
     component: () => import('../views/HomeView.vue'),
     meta: { title: '七政 · 历象 · 授时 · 节气' }
+  },
+  {
+    path: '/butiange',
+    name: 'butiange',
+    component: () => import('../views/BuTianGeView.vue'),
+    meta: { title: '七政 · 步天歌' }
+  },
+  {
+    path: '/timeline',
+    name: 'timeline',
+    component: () => import('../views/TimelineView.vue'),
+    meta: { title: '七政 · 天文史时间线' }
   }
-  // 例：{ path: '/about', name: 'about', component: () => import('../views/AboutView.vue') }
 ]
 
 const router = createRouter({

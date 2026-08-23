@@ -4,6 +4,7 @@ import OrbitScene from '../components/OrbitScene.vue'
 import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import AlmanacPanel from '../components/AlmanacPanel.vue'
+import CultureCard from '../components/CultureCard.vue'
 import { isEditableTarget } from '../composables/useContentGuard.js'
 import {
   DAY_MS,
@@ -40,6 +41,19 @@ const SKY_MODES = [
 
 const orbitSceneRef = ref(null)
 const almanacRef = ref(null)
+const cultureOpen = ref(false)
+const cultureName = ref('')
+const cultureData = ref(null)
+
+function onCultureOpen(payload) {
+  cultureName.value = payload.name
+  cultureData.value = payload.culture
+  cultureOpen.value = true
+}
+
+function closeCulture() {
+  cultureOpen.value = false
+}
 
 function snapToNoon(ms) {
   const ymd = civilOfMs(ms)
@@ -277,6 +291,7 @@ onBeforeUnmount(() => {
         :constellation-mode="constellationMode"
         :east-labels="eastLabels"
         @scrub="onScrub"
+        @culture-open="onCultureOpen"
       />
       <AlmanacPanel
         ref="almanacRef"
@@ -299,6 +314,12 @@ onBeforeUnmount(() => {
         @toggle="toggleLixiang"
         @jump="jumpTo"
         @panel-wheel="onPanelWheel"
+      />
+      <CultureCard
+        :open="cultureOpen"
+        :name="cultureName"
+        :culture="cultureData"
+        @close="closeCulture"
       />
     </main>
     <a

@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three'
 import { EAST_EXTRA_ASTERISMS } from './eastAsterisms.js'
+import { CONSTELLATION_CULTURE } from './constellationCulture.js'
 
 /** 赤经(时) 赤纬(°) → 天球坐标 */
 export function raDecToVec(raHours, decDeg, radius) {
@@ -23,6 +24,7 @@ export function raDecToVec(raHours, decDeg, radius) {
  * layer: 'west' 西象 | 'east' 古象
  * tier: 'major'|'minor'（西）| 'core'|'extra'（古）；minor / label:false 默认不贴名
  * label: false 强制不显示名称
+ * culture?: { origin?, myth?, modernRef? } 星官故事（教学向）
  * stars: [raHours, decDeg, size?]
  * lines: 星点下标连线
  *
@@ -1145,6 +1147,17 @@ export const CONSTELLATIONS = [
   },
   ...EAST_EXTRA_ASTERISMS
 ]
+
+/** 合并星官文化文案（east-core 等已录入者） */
+CONSTELLATIONS.forEach((c) => {
+  const culture = CONSTELLATION_CULTURE[c.name]
+  if (culture) c.culture = culture
+})
+
+/** 按名称取星官条目（含 culture） */
+export function getConstellationByName(name) {
+  return CONSTELLATIONS.find((c) => c.name === name) || null
+}
 
 /**
  * 行星示意轨道（相对日距已压缩，便于同屏观看）。

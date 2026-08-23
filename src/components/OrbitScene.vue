@@ -30,7 +30,7 @@ const props = defineProps({
   eastLabels: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['scrub'])
+const emit = defineEmits(['scrub', 'culture-open'])
 
 const host = ref(null)
 const canvas = ref(null)
@@ -94,7 +94,18 @@ let skyWestGroup = null
 let skyEastGroup = null
 let skyEastExtraGroup = null
 let eastLabelObjects = []
+let culturePickMeshes = []
+let pointerDown = null
+const CLICK_MOVE_PX = 8
 let mountedAlive = false
+
+function openCulture(constellation) {
+  if (!constellation?.culture) return
+  emit('culture-open', {
+    name: constellation.name,
+    culture: constellation.culture
+  })
+}
 
 function applyConstellationMode() {
   const mode = props.constellationMode || 'east'
@@ -175,6 +186,11 @@ function makeFallbackTex(draw, size) {
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
+}
+
+/** 仅在贴图存在时加入 map，避免 THREE 对 undefined 的警告 */
+function withMap(map) {
+  return map ? { map } : {}
 }
 
 function loadTexture(url, fallback) {
@@ -469,9 +485,27 @@ function clearScrubTimer() {
   pendingScrubStart = null
 }
 
+function tryPickCulture(e) {
+  const labelsEl = labelRenderer?.domElement
+  if (labelsEl?.contains(e.target)) return
+  if (!camera || !host.value || !culturePickMeshes.length) return
+  const rect = host.value.getBoundingClientRect()
+  const ndc = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  )
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(ndc, camera)
+  const hits = raycaster.intersectObjects(culturePickMeshes, false)
+  if (!hits.length) return
+  const c = hits[0].object.userData.constellation
+  if (c?.culture) openCulture(c)
+}
+
 /** Shift+左键拨日（桌面）；触屏长按后横拖拨日 */
 function onPointerDownCapture(e) {
   if (!host.value || e.button !== 0) return
+  pointerDown = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
 
   if (e.shiftKey) {
     clearScrubTimer()
@@ -525,6 +559,19 @@ function onPointerUp(e) {
   if (pendingScrubPointer === e.pointerId) {
     clearScrubTimer()
   }
+
+  if (
+    !scrubDrag &&
+    pointerDown?.pointerId === e.pointerId &&
+    host.value
+  ) {
+    const dx = Math.abs(e.clientX - pointerDown.x)
+    const dy = Math.abs(e.clientY - pointerDown.y)
+    if (dx < CLICK_MOVE_PX && dy < CLICK_MOVE_PX) {
+      tryPickCulture(e)
+    }
+  }
+  pointerDown = null
 
   if (!scrubDrag) return
   emit('scrub', {
@@ -588,6 +635,8 @@ function buildConstellationLayer(parent, layer, tier) {
       )
       m.position.copy(p.v)
       m.renderOrder = -3
+      m.userData.constellation = c
+      if (c.culture) culturePickMeshes.push(m)
       parent.add(m)
       const halo = new THREE.Mesh(
         new THREE.SphereGeometry(0.5 * p.sz, 10, 10),
@@ -628,6 +677,24 @@ function buildConstellationLayer(parent, layer, tier) {
     const anchor = pts[Math.min(li, pts.length - 1)].v.clone()
     label.position.copy(anchor).multiplyScalar(1.018)
     label.position.y += 0.45
+    if (c.culture) {
+      label.userData.constellation = c
+      const el = label.userData.el
+      el.classList.add('is-clickable')
+      el.setAttribute('role', 'button')
+      el.setAttribute('tabindex', '0')
+      el.setAttribute('aria-label', `${c.name} 星官故事`)
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation()
+        openCulture(c)
+      })
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault()
+          openCulture(c)
+        }
+      })
+    }
     parent.add(label)
     if (layer === 'east') eastLabelObjects.push(label)
   })
@@ -645,7 +712,7 @@ async function buildPlanets(parent, texMap) {
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(p.size, segs, segs),
       new THREE.MeshStandardMaterial({
-        map: map || undefined,
+        ...withMap(map),
         color: map ? 0xffffff : p.color,
         roughness: 0.48,
         metalness: 0.08,
@@ -659,12 +726,12 @@ async function buildPlanets(parent, texMap) {
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(p.size * 1.35, p.size * 2.35, 96),
         new THREE.MeshBasicMaterial({
-          map: ringMap || undefined,
+          ...withMap(ringMap),
           color: ringMap ? 0xffffff : 0xc9b896,
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.85,
-          alphaMap: ringMap || undefined
+          ...(ringMap ? { alphaMap: ringMap } : {})
         })
       )
       ring.rotation.x = Math.PI / 2.35
@@ -772,6 +839,7 @@ onMounted(async () => {
   skyRoot.add(skyEastGroup)
   skyEastGroup.add(skyEastExtraGroup)
   eastLabelObjects = []
+  culturePickMeshes = []
   buildConstellationLayer(skyWestGroup, 'west')
   buildConstellationLayer(skyEastGroup, 'east', 'core')
   buildConstellationLayer(skyEastExtraGroup, 'east', 'extra')
@@ -949,7 +1017,7 @@ onMounted(async () => {
   earthOrbit.add(earthTilt)
 
   const earthMat = new THREE.MeshStandardMaterial({
-    map: earthTex,
+    ...withMap(earthTex),
     roughness: 0.55,
     metalness: 0.08,
     emissive: new THREE.Color(0x102030),
@@ -986,7 +1054,7 @@ onMounted(async () => {
   moon = new THREE.Mesh(
     new THREE.SphereGeometry(0.42, 48, 48),
     new THREE.MeshStandardMaterial({
-      map: moonTex,
+      ...withMap(moonTex),
       roughness: 0.92,
       metalness: 0.02,
       emissive: new THREE.Color(0x222018),
@@ -1193,6 +1261,19 @@ watch(() => props.eastLabels, applyEastLabels)
   letter-spacing: 0.28em;
   color: rgba(176, 168, 148, 0.62);
   -webkit-text-stroke: 0.3px rgba(8, 14, 22, 0.4);
+}
+.orbit-labels .sky-inscribe.is-clickable {
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.orbit-labels .sky-inscribe.is-clickable:hover,
+.orbit-labels .sky-inscribe.is-clickable:focus-visible {
+  color: rgba(235, 218, 168, 0.98);
+  outline: none;
+  text-shadow:
+    0 1px 2px rgba(6, 10, 16, 0.45),
+    0 0 8px rgba(184, 150, 74, 0.22);
 }
 
 @media (max-width: 720px) {

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, useId } from 'vue'
 import { SYNODIC } from '../../lib/calendar.js'
+import { getTodayCultureTip } from '../../lib/cultureTips.js'
 
 const props = defineProps({
   currentTerm: { type: String, required: true },
@@ -16,6 +17,13 @@ const moonUid = useId()
 const moonGradId = computed(() => `${moonUid}-g`)
 const moonMaskId = computed(() => `${moonUid}-m`)
 const moonBlurId = computed(() => `${moonUid}-b`)
+
+const cultureTip = computed(() =>
+  getTodayCultureTip({
+    termName: props.currentTerm,
+    festivals: props.todayFestivals
+  })
+)
 
 const moonLitD = computed(() => {
   const f = Math.max(0, Math.min(1, props.phaseFrac))
@@ -103,6 +111,11 @@ const moonLitD = computed(() => {
     </div>
     <div v-if="todayFestivals.length" class="fest-tags">
       <span v-for="f in todayFestivals" :key="f.name" class="mini-tag">{{ f.name }}</span>
+    </div>
+    <div v-if="cultureTip" class="culture-tip">
+      <div class="sec-label">今日小知识</div>
+      <div class="tip-title">{{ cultureTip.title }}</div>
+      <p v-for="(line, i) in cultureTip.lines" :key="i" class="tip-text">{{ line }}</p>
     </div>
   </section>
 </template>
@@ -232,5 +245,29 @@ const moonLitD = computed(() => {
 
 .fest-tags .mini-tag {
   margin-left: 0;
+}
+
+.culture-tip {
+  margin-top: 0.42rem;
+  padding-top: 0.38rem;
+  border-top: 1px solid var(--rule);
+}
+
+.tip-title {
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jin-soft);
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin-bottom: 0.12rem;
+}
+
+.tip-text {
+  margin: 0.18rem 0 0;
+  font-size: var(--mute-size);
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
 }
 </style>
