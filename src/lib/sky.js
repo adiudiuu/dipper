@@ -1174,6 +1174,7 @@ export const PLANETS = [
     n: 1.602130474,
     e: 0.00677323,
     varpi: 131.60246718,
+    retrogradeSpin: true,
     tex: '/textures/venus.jpg'
   },
   {
@@ -1223,7 +1224,8 @@ export const PLANETS = [
     L0: 313.23218,
     n: 0.01173662,
     e: 0.04725744,
-    varpi: 170.96424
+    varpi: 170.96424,
+    retrogradeSpin: true
   },
   {
     id: 'neptune',
@@ -1715,7 +1717,7 @@ export function makeAsteroidBelt(count = 7200, rInner = 26.2, rOuter = 30.8) {
     yOff[i] = yy
     pos[i * 3] = Math.cos(ang) * rr
     pos[i * 3 + 1] = yy
-    pos[i * 3 + 2] = Math.sin(ang) * rr
+    pos[i * 3 + 2] = -Math.sin(ang) * rr
   }
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -1750,7 +1752,7 @@ export function updateAsteroidBelt(points, dt) {
     const r = data.radius[i]
     pos[i * 3] = Math.cos(a) * r
     pos[i * 3 + 1] = data.yOff[i] + Math.sin(a * 2.3 + i) * 0.04
-    pos[i * 3 + 2] = Math.sin(a) * r
+    pos[i * 3 + 2] = -Math.sin(a) * r
   }
   points.geometry.attributes.position.needsUpdate = true
 }

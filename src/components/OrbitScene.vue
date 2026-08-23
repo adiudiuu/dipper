@@ -52,6 +52,14 @@ const CAM_INIT_FOV = 46
 /** 历象占右，取景中心略偏，使太阳/黄道在画面中部偏左 */
 const FRAME_TARGET = { x: 6, y: 0, z: 2 }
 
+/** 黄经 λ（弧度）→ 黄道 XZ；Y 为北黄极，λ 增大为自西向东（俯视逆时针） */
+function eclipticPos(radius, lonRad) {
+  return {
+    x: Math.cos(lonRad) * radius,
+    z: -Math.sin(lonRad) * radius
+  }
+}
+
 let renderer
 let labelRenderer
 let scene
@@ -186,7 +194,7 @@ function makeOrbitRing(radius, color, opacity, segments = 160) {
   const pts = []
   for (let i = 0; i <= segments; i++) {
     const a = (i / segments) * Math.PI * 2
-    pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius))
+    pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, -Math.sin(a) * radius))
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts)
   return new THREE.Line(
@@ -309,12 +317,9 @@ function setTermActive(obj, active) {
 function syncOrbits() {
   if (!earthOrbit || !moon) return
   const earthAng = (props.sunLon + 180) * DEG
-  earthOrbit.position.set(
-    Math.cos(earthAng) * EARTH_ORBIT_R,
-    0,
-    Math.sin(earthAng) * EARTH_ORBIT_R
-  )
-  const moonAng = (props.moonAge / SYNODIC) * Math.PI * 2
+  const earthPos = eclipticPos(EARTH_ORBIT_R, earthAng)
+  earthOrbit.position.set(earthPos.x, 0, earthPos.z)
+  const moonAng = -(props.moonAge / SYNODIC) * Math.PI * 2
   const toSun = new THREE.Vector3(-earthOrbit.position.x, 0, -earthOrbit.position.z).normalize()
   // 锥体默认尖端朝 +Y，对准太阳方向
   if (sunMarker && toSun.lengthSq() > 1e-8) {
@@ -334,7 +339,8 @@ function syncOrbits() {
       if (!p) return
       // 日心黄经 → 与地球同一黄道面方位（尺度压缩，角度按天文近似）
       const ang = planetAngle(jd, p)
-      node.position.set(Math.cos(ang) * p.orbit, 0, Math.sin(ang) * p.orbit)
+      const pp = eclipticPos(p.orbit, ang)
+      node.position.set(pp.x, 0, pp.z)
     })
   }
   highlightTerm(props.currentTerm)
@@ -370,17 +376,20 @@ function animate(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   simTime += dt
-  /* 自转：从北极（局部 +Y）俯视应为逆时针；Three.js 正 Y 转为顺时针，故取负 */
+  /* 自转：从北极（局部 +Y）俯视应为逆时针（自西向东）；Three.js 正 Y 为顺时针，顺行取负 */
   if (earth) earth.rotation.y -= dt * 0.85
-  if (moon) moon.rotation.y += dt * 0.32
-  if (sun) sun.rotation.y += dt * 0.04
+  if (moon) moon.rotation.y -= dt * 0.32
+  if (sun) sun.rotation.y -= dt * 0.04
   sunGlowLayers.forEach((g, i) => {
     const pulse = 1 + 0.035 * Math.sin(now * 0.0018 + i)
     g.scale.setScalar(g.userData.baseScale * pulse)
   })
   if (planetGroup) {
     planetGroup.children.forEach((n) => {
-      if (n.userData.spin) n.rotation.y += dt * n.userData.spin
+      if (!n.userData.spin) return
+      const retro = n.userData.planet?.retrogradeSpin
+      const sign = retro ? 1 : -1
+      n.rotation.y += sign * dt * n.userData.spin
     })
   }
   twinkleStars.forEach((pts) => {
@@ -804,9 +813,11 @@ onMounted(async () => {
     const len = jq.zhong ? 1.85 : 1.15
     const r0 = EARTH_ORBIT_R - 0.12
     const r1 = EARTH_ORBIT_R + len
+    const p0 = eclipticPos(r0, a)
+    const p1 = eclipticPos(r1, a)
     const g = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(Math.cos(a) * r0, 0, Math.sin(a) * r0),
-      new THREE.Vector3(Math.cos(a) * r1, 0, Math.sin(a) * r1)
+      new THREE.Vector3(p0.x, 0, p0.z),
+      new THREE.Vector3(p1.x, 0, p1.z)
     ])
     termGroup.add(
       new THREE.Line(
@@ -822,7 +833,8 @@ onMounted(async () => {
     const label = makeTermInscribe(jq)
     // 刻度外侧略抬高，字贴黄道环旁、不压轨道
     const lr = EARTH_ORBIT_R + len + 1.35
-    label.position.set(Math.cos(a) * lr, 0.08, Math.sin(a) * lr)
+    const lp = eclipticPos(lr, a)
+    label.position.set(lp.x, 0.08, lp.z)
     termGroup.add(label)
     termLabelObjects.push(label)
   }
