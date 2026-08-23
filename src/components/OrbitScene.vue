@@ -465,9 +465,6 @@ function clearScrubTimer() {
     clearTimeout(scrubTimer)
     scrubTimer = null
   }
-  if (pendingScrubPointer != null && !scrubDrag && controls) {
-    controls.enabled = true
-  }
   pendingScrubPointer = null
   pendingScrubStart = null
 }
@@ -484,10 +481,9 @@ function onPointerDownCapture(e) {
   }
 
   if (isCoarsePointer() && e.pointerType === 'touch' && !scrubDrag) {
+    clearScrubTimer()
     pendingScrubPointer = e.pointerId
     pendingScrubStart = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
-    clearScrubTimer()
-    if (controls) controls.enabled = false
     const pendingId = e.pointerId
     scrubTimer = setTimeout(() => {
       scrubTimer = null

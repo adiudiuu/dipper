@@ -330,7 +330,6 @@ onBeforeUnmount(() => {
 
 .stage {
   position: relative;
-  z-index: 1;
   height: 100%;
   min-height: 0;
 }
