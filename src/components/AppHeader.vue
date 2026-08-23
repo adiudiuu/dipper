@@ -12,7 +12,8 @@ const emit = defineEmits([
   'update:constellationMode',
   'update:eastLabels',
   'update:dateValue',
-  'defaults'
+  'defaults',
+  'addDays'
 ])
 
 const showEastLabelToggle = computed(
@@ -62,6 +63,20 @@ const showEastLabelToggle = computed(
           @click="emit('update:eastLabels', false)"
         >隐名</button>
       </div>
+      <div class="day-nav" role="group" aria-label="换日">
+        <button
+          type="button"
+          class="day-nav-btn"
+          aria-label="上一日"
+          @click="emit('addDays', -1)"
+        >‹</button>
+        <button
+          type="button"
+          class="day-nav-btn"
+          aria-label="下一日"
+          @click="emit('addDays', 1)"
+        >›</button>
+      </div>
       <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
       <label class="date-wrap" title="跳转到指定公历日期">
         <input
@@ -84,7 +99,11 @@ const showEastLabelToggle = computed(
   justify-content: space-between;
   gap: 1.25rem;
   flex-wrap: wrap;
-  padding: 1rem 1.5rem 0.65rem;
+  padding:
+    calc(1rem + var(--safe-top))
+    calc(1.5rem + var(--safe-right))
+    0.65rem
+    calc(1.5rem + var(--safe-left));
   background: linear-gradient(
     180deg,
     rgba(8, 14, 22, 0.88) 0%,
@@ -177,6 +196,35 @@ const showEastLabelToggle = computed(
   margin-left: 0.15rem;
 }
 
+.day-nav {
+  display: none;
+  align-items: stretch;
+  border: 1px solid rgba(90, 138, 140, 0.22);
+  background: rgba(14, 22, 32, 0.55);
+}
+
+.day-nav-btn {
+  appearance: none;
+  border: none;
+  border-right: 1px solid rgba(90, 138, 140, 0.16);
+  background: transparent;
+  color: rgba(233, 228, 214, 0.72);
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+
+.day-nav-btn:last-child {
+  border-right: none;
+}
+
+.day-nav-btn:hover {
+  color: var(--dan-jin);
+  background: rgba(184, 150, 74, 0.08);
+}
+
 .btn {
   appearance: none;
   border: 1px solid rgba(90, 138, 140, 0.28);
@@ -228,11 +276,97 @@ const showEastLabelToggle = computed(
 }
 
 @media (max-width: 720px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding:
+      calc(0.72rem + var(--safe-top))
+      calc(0.85rem + var(--safe-right))
+      0.55rem
+      calc(0.85rem + var(--safe-left));
+  }
+
   .brand h1 {
     font-size: 1.1rem;
   }
+
+  .brand .sub {
+    font-size: 0.62rem;
+  }
+
   .actions {
+    width: 100%;
     min-height: auto;
+    gap: 0.45rem;
+  }
+
+  .sky-mode,
+  .sky-mode-labels {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .sky-mode::-webkit-scrollbar,
+  .sky-mode-labels::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sky-mode,
+  .sky-mode-labels,
+  .day-nav {
+    min-height: var(--tap-min);
+  }
+
+  .sky-mode-btn,
+  .day-nav-btn,
+  .btn {
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    height: auto;
+  }
+
+  .sky-mode-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    padding: 0 0.72rem;
+  }
+
+  .day-nav {
+    display: inline-flex;
+  }
+
+  .date-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .date-wrap input[type='date'] {
+    width: 100%;
+    min-height: var(--tap-min);
+    height: auto;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .brand .sub {
+    display: none;
+  }
+
+  .sky-mode-labels {
+    display: none;
+  }
+
+  .btn {
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    padding: 0.38rem 0.55rem;
   }
 }
 </style>

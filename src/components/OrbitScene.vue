@@ -38,6 +38,8 @@ const canvas = ref(null)
 const EARTH_ORBIT_R = 16
 const MOON_ORBIT_R = 3.4
 const PX_PER_DAY = 5
+const SCRUB_LONG_PRESS_MS = 420
+const SCRUB_MOVE_CANCEL_PX = 10
 /** 星座天球：紧贴最外行星之外，默认取景即可收入外缘 */
 const SKY_R = 70
 /** 星座张角相对真实赤经赤纬再收一档，常见座更容易一屏看全 */
@@ -82,12 +84,17 @@ let termLabelObjects = []
 let lastTermName = ''
 let animId = 0
 let scrubDrag = null
+let scrubTimer = null
+let pendingScrubPointer = null
+let pendingScrubStart = null
+let scrubHintTimer = null
 let lastT = 0
 let ro
 let skyWestGroup = null
 let skyEastGroup = null
 let skyEastExtraGroup = null
 let eastLabelObjects = []
+let mountedAlive = false
 
 function applyConstellationMode() {
   const mode = props.constellationMode || 'east'
@@ -412,11 +419,37 @@ function animate(now) {
   animId = requestAnimationFrame(animate)
 }
 
-/** Shift+左键拨日：捕获阶段关掉 OrbitControls，避免抢旋转 */
-function onPointerDownCapture(e) {
-  if (!host.value || !e.shiftKey || e.button !== 0) return
+function isCoarsePointer() {
+  return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+}
+
+function clearScrubHintTimer() {
+  if (scrubHintTimer != null) {
+    clearTimeout(scrubHintTimer)
+    scrubHintTimer = null
+  }
+}
+
+function clearScrubHint() {
+  clearScrubHintTimer()
+  host.value?.classList.remove('scrub-engaged')
+}
+
+function showScrubEngaged() {
+  clearScrubHintTimer()
+  host.value?.classList.add('scrub-engaged')
+  scrubHintTimer = setTimeout(() => {
+    scrubHintTimer = null
+    host.value?.classList.remove('scrub-engaged')
+  }, 900)
+  navigator.vibrate?.(10)
+}
+
+function beginScrub(e, fromLongPress = false) {
   if (controls) controls.enabled = false
-  host.value.setPointerCapture(e.pointerId)
+  host.value?.setPointerCapture(e.pointerId)
+  host.value?.classList.add('is-scrubbing')
+  if (fromLongPress) showScrubEngaged()
   scrubDrag = {
     x: e.clientX,
     lastX: e.clientX,
@@ -427,7 +460,60 @@ function onPointerDownCapture(e) {
   emit('scrub', { mode: 'start' })
 }
 
+function clearScrubTimer() {
+  if (scrubTimer != null) {
+    clearTimeout(scrubTimer)
+    scrubTimer = null
+  }
+  if (pendingScrubPointer != null && !scrubDrag && controls) {
+    controls.enabled = true
+  }
+  pendingScrubPointer = null
+  pendingScrubStart = null
+}
+
+/** Shift+左键拨日（桌面）；触屏长按后横拖拨日 */
+function onPointerDownCapture(e) {
+  if (!host.value || e.button !== 0) return
+
+  if (e.shiftKey) {
+    clearScrubTimer()
+    if (controls) controls.enabled = false
+    beginScrub(e)
+    return
+  }
+
+  if (isCoarsePointer() && e.pointerType === 'touch' && !scrubDrag) {
+    pendingScrubPointer = e.pointerId
+    pendingScrubStart = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
+    clearScrubTimer()
+    if (controls) controls.enabled = false
+    const pendingId = e.pointerId
+    scrubTimer = setTimeout(() => {
+      scrubTimer = null
+      if (pendingScrubPointer !== pendingId || !pendingScrubStart) return
+      beginScrub(
+        {
+          pointerId: pendingScrubStart.pointerId,
+          clientX: pendingScrubStart.x,
+          clientY: pendingScrubStart.y,
+          button: 0
+        },
+        true
+      )
+    }, SCRUB_LONG_PRESS_MS)
+  }
+}
+
 function onPointerMove(e) {
+  if (pendingScrubPointer === e.pointerId && pendingScrubStart && !scrubDrag) {
+    const dx = Math.abs(e.clientX - pendingScrubStart.x)
+    const dy = Math.abs(e.clientY - pendingScrubStart.y)
+    if (dx > SCRUB_MOVE_CANCEL_PX || dy > SCRUB_MOVE_CANCEL_PX) {
+      clearScrubTimer()
+    }
+  }
+
   if (!scrubDrag) return
   const dx = e.clientX - scrubDrag.x
   const now = performance.now()
@@ -439,7 +525,11 @@ function onPointerMove(e) {
   emit('scrub', { mode: 'drag', days: scrubDrag.days })
 }
 
-function onPointerUp() {
+function onPointerUp(e) {
+  if (pendingScrubPointer === e.pointerId) {
+    clearScrubTimer()
+  }
+
   if (!scrubDrag) return
   emit('scrub', {
     mode: 'end',
@@ -447,6 +537,13 @@ function onPointerUp() {
     velocity: scrubDrag.vx / PX_PER_DAY
   })
   scrubDrag = null
+  host.value?.classList.remove('is-scrubbing')
+  clearScrubHint()
+  try {
+    host.value?.releasePointerCapture(e.pointerId)
+  } catch {
+    /* not captured */
+  }
   if (controls) controls.enabled = true
 }
 
@@ -590,6 +687,7 @@ async function buildPlanets(parent, texMap) {
 }
 
 onMounted(async () => {
+  mountedAlive = true
   scene = new THREE.Scene()
   // 外行星轨道远，雾过浓会吞掉星点与星座；仅作极淡景深
   scene.fog = new THREE.FogExp2(0x0a121a, 0.00135)
@@ -629,6 +727,7 @@ onMounted(async () => {
       /* ignore */
     }
   }
+  if (!mountedAlive) return
 
   // 天球壳大于最远星点与相机拉远上限，BackSide 从内侧看
   scene.add(makeNebulaShell(230))
@@ -725,6 +824,7 @@ onMounted(async () => {
     loadTexture('/textures/saturn.jpg', null),
     loadTexture('/textures/saturn_ring.png', null)
   ])
+  if (!mountedAlive) return
 
   sun = new THREE.Mesh(
     new THREE.SphereGeometry(2.55, 64, 64),
@@ -918,11 +1018,15 @@ onMounted(async () => {
     saturn: saturnTex,
     saturnRing
   })
+  if (!mountedAlive) return
 
   syncOrbits()
   resize()
   ro = new ResizeObserver(resize)
   ro.observe(host.value)
+  window.visualViewport?.addEventListener('resize', resize)
+  window.visualViewport?.addEventListener('scroll', resize)
+  window.addEventListener('orientationchange', resize)
   lastT = performance.now()
   animId = requestAnimationFrame(animate)
 
@@ -935,8 +1039,14 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  mountedAlive = false
   cancelAnimationFrame(animId)
   ro?.disconnect()
+  window.visualViewport?.removeEventListener('resize', resize)
+  window.visualViewport?.removeEventListener('scroll', resize)
+  window.removeEventListener('orientationchange', resize)
+  clearScrubTimer()
+  clearScrubHint()
   if (host.value) {
     host.value.removeEventListener('pointerdown', onPointerDownCapture, true)
     host.value.removeEventListener('pointermove', onPointerMove)
@@ -962,6 +1072,7 @@ watch(() => props.eastLabels, applyEastLabels)
 <template>
   <div ref="host" class="orbit-host">
     <canvas ref="canvas" class="orbit-canvas" />
+    <div class="scrub-toast" aria-hidden="true">拨日</div>
   </div>
 </template>
 
@@ -977,6 +1088,31 @@ watch(() => props.eastLabels, applyEastLabels)
 }
 .orbit-host:active {
   cursor: grabbing;
+}
+.orbit-host.is-scrubbing {
+  cursor: ew-resize;
+}
+.orbit-host.scrub-engaged .scrub-toast {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.scrub-toast {
+  position: absolute;
+  left: 50%;
+  top: calc(0.85rem + var(--safe-top));
+  z-index: 2;
+  transform: translate(-50%, -0.35rem);
+  padding: 0.32rem 0.72rem;
+  border: 1px solid rgba(184, 150, 74, 0.45);
+  border-radius: 999px;
+  background: rgba(8, 14, 22, 0.88);
+  color: var(--dan-jin);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .orbit-canvas {
   display: block;
@@ -1061,5 +1197,35 @@ watch(() => props.eastLabels, applyEastLabels)
   letter-spacing: 0.28em;
   color: rgba(176, 168, 148, 0.62);
   -webkit-text-stroke: 0.3px rgba(8, 14, 22, 0.4);
+}
+
+@media (max-width: 720px) {
+  .orbit-labels .term-inscribe {
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    padding-left: 0.32em;
+  }
+  .orbit-labels .term-inscribe.is-zhong {
+    font-size: 11px;
+    letter-spacing: 0.34em;
+    padding-left: 0.34em;
+  }
+  .orbit-labels .term-inscribe.is-active {
+    font-size: 11.5px;
+    letter-spacing: 0.36em;
+    padding-left: 0.36em;
+  }
+  .orbit-labels .term-inscribe.is-active.is-zhong {
+    font-size: 12px;
+  }
+  .orbit-labels .sky-inscribe {
+    font-size: 9.5px;
+    letter-spacing: 0.28em;
+    padding-left: 0.28em;
+  }
+  .orbit-labels .sky-inscribe.is-quiet {
+    font-size: 8.5px;
+    letter-spacing: 0.22em;
+  }
 }
 </style>

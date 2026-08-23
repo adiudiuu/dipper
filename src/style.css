@@ -99,6 +99,12 @@
   --font-serif: 'Noto Serif SC', 'Songti SC', serif;
   --font-sans: 'Noto Sans SC', 'PingFang SC', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --app-height: 100%;
+  --tap-min: 44px;
 }
 
 *,
@@ -109,14 +115,29 @@
   padding: 0;
 }
 
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
+html {
+  height: var(--app-height);
+  height: -webkit-fill-available;
+}
+
 html,
 body,
 #app {
-  height: 100%;
+  height: var(--app-height);
+  min-height: var(--app-height);
   background: #080e16;
   color: var(--xuan-zhi);
   font-family: var(--font-sans);
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   -webkit-user-select: none;
@@ -130,4 +151,13 @@ textarea,
 select {
   -webkit-user-select: text;
   user-select: text;
+}
+
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
 }

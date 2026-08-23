@@ -21,9 +21,14 @@ import {
 import { getFestivalsOn } from '../lib/festivals.js'
 import { formatSuiXing } from '../lib/sky.js'
 
+const DESKTOP_MQ = '(min-width: 721px)'
+const MOBILE_HINT_KEY = 'dipper.mobileHintDismissed'
+
 const currentMs = ref(Date.now())
 const scrubOriginMs = ref(null)
-const lixiangOpen = ref(true)
+const lixiangOpen = ref(typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches)
+const isMobileLayout = ref(typeof window !== 'undefined' && !window.matchMedia(DESKTOP_MQ).matches)
+const showMobileHint = ref(false)
 const constellationMode = ref('east')
 const eastLabels = ref(true)
 const SKY_MODES = [
@@ -119,7 +124,7 @@ function goDefaults() {
   scrubOriginMs.value = null
   constellationMode.value = 'east'
   eastLabels.value = true
-  lixiangOpen.value = true
+  lixiangOpen.value = defaultLixiangOpen()
   setDate(Date.now())
   nextTick(() => {
     orbitSceneRef.value?.resetCamera?.()
@@ -137,6 +142,24 @@ function jumpTo(item) {
 
 function toggleLixiang() {
   lixiangOpen.value = !lixiangOpen.value
+}
+
+function defaultLixiangOpen() {
+  return window.matchMedia(DESKTOP_MQ).matches
+}
+
+function syncLayoutBreakpoint() {
+  const desktop = window.matchMedia(DESKTOP_MQ).matches
+  isMobileLayout.value = !desktop
+}
+
+function dismissMobileHint() {
+  showMobileHint.value = false
+  try {
+    localStorage.setItem(MOBILE_HINT_KEY, '1')
+  } catch {
+    /* ignore */
+  }
 }
 
 let inertiaId = 0
@@ -188,14 +211,37 @@ function onKeydown(e) {
   }
 }
 
+let desktopMq
+let onBreakpointChange
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   setDate(Date.now())
+
+  desktopMq = window.matchMedia(DESKTOP_MQ)
+  isMobileLayout.value = !desktopMq.matches
+  onBreakpointChange = () => syncLayoutBreakpoint()
+  desktopMq.addEventListener('change', onBreakpointChange)
+  window.addEventListener('orientationchange', onBreakpointChange)
+
+  if (
+    isMobileLayout.value &&
+    typeof matchMedia === 'function' &&
+    matchMedia('(pointer: coarse)').matches
+  ) {
+    try {
+      if (!localStorage.getItem(MOBILE_HINT_KEY)) showMobileHint.value = true
+    } catch {
+      showMobileHint.value = true
+    }
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   cancelAnimationFrame(inertiaId)
+  desktopMq?.removeEventListener('change', onBreakpointChange)
+  window.removeEventListener('orientationchange', onBreakpointChange)
 })
 </script>
 
@@ -208,7 +254,19 @@ onBeforeUnmount(() => {
       v-model:date-value="dateInputValue"
       :sky-modes="SKY_MODES"
       @defaults="goDefaults"
+      @add-days="addDays"
     />
+    <button
+      v-if="lixiangOpen && isMobileLayout"
+      type="button"
+      class="panel-overlay"
+      aria-label="关闭历象"
+      @click="toggleLixiang"
+    />
+    <div v-if="showMobileHint" class="mobile-hint" role="status">
+      <p>长按画面后横拖可拨日；顶栏 ‹ › 可换日</p>
+      <button type="button" class="mobile-hint-dismiss" @click="dismissMobileHint">知道了</button>
+    </div>
     <main class="stage">
       <OrbitScene
         ref="orbitSceneRef"
@@ -279,13 +337,14 @@ onBeforeUnmount(() => {
 
 .github-link {
   position: fixed;
-  left: 0.7rem;
-  bottom: 0.55rem;
+  left: calc(0.7rem + var(--safe-left));
+  bottom: calc(0.55rem + var(--safe-bottom));
   z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
-  padding: 0.2rem 0.35rem;
+  padding: 0.35rem 0.45rem;
+  min-height: var(--tap-min);
   font-family: var(--font-sans);
   font-size: 0.58rem;
   letter-spacing: 0.12em;
@@ -307,12 +366,65 @@ onBeforeUnmount(() => {
   opacity: 0.9;
 }
 
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(4, 8, 14, 0.42);
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5.5rem + var(--safe-bottom));
+  z-index: 25;
+  transform: translateX(-50%);
+  width: min(18rem, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
+  padding: 0.65rem 0.75rem 0.55rem;
+  border: 1px solid rgba(90, 138, 140, 0.28);
+  background: rgba(8, 14, 22, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.mobile-hint p {
+  font-size: 0.72rem;
+  line-height: 1.55;
+  letter-spacing: 0.06em;
+  color: rgba(233, 228, 214, 0.88);
+}
+
+.mobile-hint-dismiss {
+  appearance: none;
+  margin-top: 0.55rem;
+  border: 1px solid rgba(184, 150, 74, 0.45);
+  background: rgba(184, 150, 74, 0.1);
+  color: var(--dan-jin);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  padding: 0.38rem 0.85rem;
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
   .github-link {
-    left: 0.45rem;
-    bottom: 0.4rem;
+    left: calc(0.45rem + var(--safe-left));
+    bottom: calc(0.4rem + var(--safe-bottom));
     font-size: 0.52rem;
     letter-spacing: 0.1em;
+  }
+
+  .mobile-hint {
+    bottom: calc(4.8rem + var(--safe-bottom));
   }
 }
 </style>

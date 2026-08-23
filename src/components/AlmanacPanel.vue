@@ -193,6 +193,7 @@ defineExpose({ resetFestivals })
   justify-content: center;
   gap: 0.45rem;
   padding: 0.55rem 0;
+  min-height: var(--tap-min);
   transition: background 0.2s, color 0.2s;
   text-shadow: var(--text-glow);
 }
@@ -265,13 +266,39 @@ defineExpose({ resetFestivals })
 
 @media (max-width: 720px) {
   .lixiang {
-    --panel-w: min(16.5rem, calc(100vw - 1.3rem - var(--rail-w)));
-    right: 0.65rem;
+    --rail-w: 2.75rem;
+    --panel-w: min(16.5rem, calc(100vw - 1.3rem - var(--rail-w) - var(--safe-right)));
+    position: fixed;
+    z-index: 25;
+    right: calc(0.65rem + var(--safe-right));
     left: auto;
     top: auto;
-    bottom: 0.55rem;
-    height: min(58vh, calc(100% - 1.1rem));
-    max-height: min(58vh, calc(100% - 1.1rem));
+    bottom: calc(0.55rem + var(--safe-bottom));
+    height: min(52vh, calc(100% - 1.1rem - var(--safe-bottom)));
+    max-height: min(52vh, calc(100% - 1.1rem - var(--safe-bottom)));
+    border-radius: 0.55rem 0 0 0.55rem;
+    box-shadow:
+      0 -4px 24px rgba(0, 0, 0, 0.28),
+      0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .lixiang-rail {
+    min-width: var(--rail-w);
+    min-height: var(--tap-min);
+  }
+
+  .rail-title {
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+  }
+}
+
+@media (max-width: 480px) {
+  .lixiang:not(.collapsed) {
+    --panel-w: calc(100vw - 0.9rem - var(--rail-w) - var(--safe-left) - var(--safe-right));
+    left: calc(0.45rem + var(--safe-left));
+    right: calc(0.45rem + var(--safe-right));
+    width: auto;
   }
 }
 </style>

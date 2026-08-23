@@ -10,6 +10,42 @@
 
 出典：《尚书·舜典》「璇玑玉衡，以齐七政」。通常**七政**指**日、月**与**金、木、水、火、土**五星。本站以此为名，做轨道与历法对照，供观象与学习。资料与依赖详见下方 [出处](#出处--资料来源)。
 
+## 功能概览
+
+### 三维历象
+
+- 日—地—月与五星的压缩轨道示意，黄道、节气圈、月相与行星方位随所选日期联动
+- 星象层可切换：**西象**（IAU 88 星座示意）· **古象纲**（三垣·二十八宿·北斗）· **古象繁**（陈卓体系全表量级示意）· **全部**
+- 古象繁 / 全部模式下可**显名**或**隐名**，减轻标签遮挡
+- 星空背景含星场、星云、小行星带、彗星等装饰层
+
+### 历象侧栏
+
+- 公历、农历（含闰月标注）、道历、岁星（太岁）
+- 当前节气、距下一节气/中气天数、月相与月龄
+- 当日传统节日与近期节日列表（农历节、公历节、清明/冬至/除夕等），点击可跳转日期
+
+### 日期与交互
+
+- 顶栏公历日期选择器；`←` / `→` 换日（桌面 Shift 为 ±30 日）
+- 三维场景内**横拖拨日**（桌面 Shift + 左键拖；触屏长按后横拖），松手带惯性
+- **默认**按钮一键恢复日期、相机、星象层与面板初始态
+
+### 移动端与 Safari
+
+- 响应式布局（断点 ≤720px）：历象侧栏默认收起，全屏三维；顶栏控件自适应换行
+- 适配刘海屏与 Home 指示条（`viewport-fit=cover`、`safe-area-inset`）
+- 支持 iOS Safari 添加到主屏幕（`apple-mobile-web-app-capable`）
+- 触屏手势：单指旋转 · 双指缩放平移 · 长按后横拖拨日 · 顶栏 ‹ › 换日
+- 首次进入触屏设备显示操作提示；`visualViewport` 变化时自动重算画布尺寸
+
+## 操作摘要
+
+| 平台 | 三维 | 换日 | 星象 / 历象 |
+| --- | --- | --- | --- |
+| **桌面** | 左键旋转 · 右键/中键平移 · 滚轮缩放 · Shift + 左键横拖拨日 | 顶栏选日期 · `←`/`→`（Shift ±30 日） | 顶栏切星象层 · 古象可显/隐名 · 右侧历象可收起 |
+| **触屏** | 单指旋转 · 双指缩放平移 · 长按后横拖拨日 | 顶栏 ‹ › · 日期选择器 | 顶栏切星象层 · 侧栏「历象」展开/收起 |
+
 ## 本地运行
 
 ```bash
@@ -26,28 +62,7 @@ npm run preview
 
 开发默认端口：`5173`。
 
-## 操作摘要
-
-- **三维：** 左键旋转 · 右键/中键平移 · 滚轮缩放 · Shift 拨日
-- **日期：** 顶栏选公历；`←` / `→` 换日（Shift 为 ±30 日）
-- **星象：** 西象 / 古象纲 / 古象繁 / 全部；古象可显名或隐名
-- **历象：** 右侧面板可收起；含公历、农历·道历·岁星、节气·月相、节日列表
-- **默认：** 一键恢复日期、相机、星象与面板初始态
-
-## 路由（加新页）
-
-路由集中在 `src/router/index.js`（`createWebHistory`）。
-
-1. 在 `src/views/` 新建 `XxxView.vue`
-2. 在 `routes` 增加一项，例如：
-
-```js
-{ path: '/about', name: 'about', component: () => import('../views/AboutView.vue') }
-```
-
-当前 `/` → `HomeView`（主界面）。
-
-## Cloudflare Pages
+## 部署（Cloudflare Pages）
 
 本仓库为 Vite SPA，构建产物在 `dist/`。
 
@@ -61,9 +76,23 @@ npm run preview
 
 Dashboard 新建 Pages 项目 → 连接仓库 → 填上表 Build command / Output directory 即可。
 
-## 字体
+## 字体与静态资源
 
-已去掉 Google Fonts CDN。字重文件在 **`public/fonts/`**（Noto Sans/Serif SC 400/500/600、JetBrains Mono 400/500，含拉丁子集），由 `src/style.css` 的 `@font-face` 本地加载。
+- **字体**：Noto Sans SC、Noto Serif SC、JetBrains Mono 字重子集托管于 `public/fonts/`，由 `src/style.css` 的 `@font-face` 本地加载
+- **天体贴图**：日 / 地 / 月 / 行星等球面贴图缓存于 `public/textures/`，来源见 [出处](#天体贴图)
+
+## 路由（加新页）
+
+路由集中在 `src/router/index.js`（`createWebHistory`）。
+
+1. 在 `src/views/` 新建 `XxxView.vue`
+2. 在 `routes` 增加一项，例如：
+
+```js
+{ path: '/about', name: 'about', component: () => import('../views/AboutView.vue') }
+```
+
+当前 `/` → `HomeView`（主界面）。
 
 ## 开源许可
 
@@ -108,4 +137,4 @@ Dashboard 新建 Pages 项目 → 连接仓库 → 填上表 Build command / Out
 
 ### 字体
 
-Noto Sans / Serif SC、JetBrains Mono 本地子集，见 `public/fonts/`（已不依赖 Google Fonts CDN）。
+- [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) · [Noto Serif SC](https://fonts.google.com/noto/specimen/Noto+Serif+SC) · [JetBrains Mono](https://www.jetbrains.com/lp/mono/)：本地子集见 `public/fonts/`。

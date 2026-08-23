@@ -146,7 +146,8 @@ defineExpose({ resetScroll, resetUpcoming })
       <p v-if="!festHasMore && upcoming.length" class="fest-end">没有更多</p>
     </div>
     <div class="panel-notes">
-      <p class="tip">左键旋转 · 右键/中键平移 · 滚轮缩放 · Shift 拨日 · ← → 换日 · 顶栏切星象</p>
+      <p class="tip tip-desktop">左键旋转 · 右键/中键平移 · 滚轮缩放 · Shift 拨日 · ← → 换日 · 顶栏切星象</p>
+      <p class="tip tip-mobile">单指旋转 · 双指缩放平移 · 长按后横拖拨日 · 顶栏 ‹ › 换日 · 顶栏切星象</p>
     </div>
   </section>
 </template>
@@ -359,5 +360,24 @@ defineExpose({ resetScroll, resetUpcoming })
   letter-spacing: 0.06em;
   line-height: 1.55;
   text-shadow: var(--text-glow);
+}
+
+.tip-mobile {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .tip-desktop {
+    display: none;
+  }
+
+  .tip-mobile {
+    display: block;
+  }
+
+  .fest-row {
+    min-height: var(--tap-min);
+    padding: 0.5rem 0.08rem;
+  }
 }
 </style>
