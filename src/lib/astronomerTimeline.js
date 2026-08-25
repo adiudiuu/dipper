@@ -3,7 +3,7 @@
  * 年代与成就据正史、专业天文史著述整理，供科普阅读。
  */
 
-/** @typedef {{ id: string, name: string, era: string, dates: string, bio: string, achievements: string[], relatedCalendars?: string[] }} AstronomerEntry */
+/** @typedef {{ id: string, name: string, era: string, dates: string, dateRange: { start: number, end: number }, bio: string, achievements: string[], relatedCalendars?: string[] }} AstronomerEntry */
 
 /** @type {AstronomerEntry[]} */
 export const ASTRONOMER_TIMELINE = [
@@ -12,6 +12,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '落下闳',
     era: '西汉',
     dates: '前156—前87',
+    dateRange: { start: -156, end: -87 },
     bio:
       '落下闳，字长公，巴蜀阆中人，西汉著名天文学家。汉武帝元封年间与邓平、唐都等奉诏改历，主持编制《太初历》，这是中国历法史上第一次大规模天文实测改历。他提出「八十一分法」调整回归年长，并倡导以浑天说解释天象。民间传说他在长安建浑天仪，虽细节难考，但体现了早期实测历法的开创精神。落下闳的工作把观星、测影与历法编算结合起来，为后世历算家树立了「实测为本」的传统。',
     achievements: [
@@ -26,6 +27,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '刘歆',
     era: '西汉末 / 新莽',
     dates: '前53—23',
+    dateRange: { start: -53, end: 23 },
     bio:
       '刘歆，字子骏，经学家、天文学家，刘向之子。他整理先秦典籍，在《三统历》中系统引入「三统」周期与律历相配思想，把天文常数与音律、五行观念纳入统一框架。虽然后世对其政治立场与经学立场评价不一，但《三统历》在数学化表达岁实、朔望月长度方面较前代更为精密，并首次较完整地记载二十四节气与历法的对应关系。刘歆的工作体现了汉代历算由经验积累走向理论建构的转折，对理解中国历法「常数化」进程具有教学价值。',
     achievements: [
@@ -40,6 +42,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '张衡',
     era: '东汉',
     dates: '78—139',
+    dateRange: { start: 78, end: 139 },
     bio:
       '张衡，字平子，南阳西鄂人，东汉科学家、文学家。他在《浑天仪图注》《灵宪》等著作中系统阐述浑天说，认为天如鸡子、地如蛋黄，日月星辰附于天球而运转。张衡改进浑天仪，以漏水驱动机械转动，并创制候风地动仪用于地震监测。天文方面，他测定恒星的「常数」、讨论月食成因，还估算过天地尺度。张衡把观测、机械制作与理论著述融为一体，代表了中国古代天文从「观象记数」走向「仪器模拟 + 理论解释」的重要阶段，影响深远。',
     achievements: [
@@ -55,6 +58,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '祖冲之',
     era: '南朝宋',
     dates: '429—500',
+    dateRange: { start: 429, end: 500 },
     bio:
       '祖冲之，字文远，范阳遒人，南北朝杰出数学家、天文学家。他在刘宋大明六年（462 年）提出《大明历》，定岁实为一回归年 365.24281481 日，朔实 29.5309 日，精度领先世界同代水平。祖冲之引入「岁差」思想，指出冬至点位置缓慢西移，比西方发现岁差早约一千年。他还计算圆周率 π 在 3.1415926 与 3.1415927 之间，并著《缀术》。祖冲之把精密数学引入历法推步，体现了「以数定历」的高峰，是理解中国历法数学化进程不可绕过的关键人物。',
     achievements: [
@@ -70,6 +74,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '僧一行',
     era: '唐',
     dates: '683—727',
+    dateRange: { start: 683, end: 727 },
     bio:
       '僧一行，俗姓张，魏州昌乐人，唐代天文学家、佛学家。开元年间，他奉唐玄宗之命与梁令瓒等主持编修《大衍历》，并在全国组织子午线长度测量——「子午线实测」，这是世界天文史上著名的大规模大地测量。一行在历法中引入「插补法」处理日月运动不均匀问题，使推步精度显著提高。他还制作水运浑天俯视仪，与机械计时结合。僧一行的工作把历法改革、全国实测与仪器创新结合起来，展示了盛唐国家天文工程的组织能力，也是理解中国古代测绘与天文交叉的典型案例。',
     achievements: [
@@ -85,6 +90,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '沈括',
     era: '北宋',
     dates: '1031—1095',
+    dateRange: { start: 1031, end: 1095 },
     bio:
       '沈括，字存中，钱塘人，北宋科学家、政治家。他在《梦溪笔谈》中记录了大量天文、历法、气象观察，最早明确记载「指南针」用于航海，并讨论月相变化与日月食成因。沈括指出极星位置随时间变化，实质上是岁差现象的民间科学表述；他还批评当时历法误差，主张以观测修正。作为主管天文历法的官员，他参与历法改革讨论，强调仪器观测与实测记录的重要性。沈括把格物致知的学风写入笔记体著作，使天文知识更易传播，是连接官方历算与民间科学观察的桥梁人物。',
     achievements: [
@@ -100,6 +106,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '郭守敬',
     era: '元',
     dates: '1231—1316',
+    dateRange: { start: 1231, end: 1316 },
     bio:
       '郭守敬，字若思，邢州邢台人，元代天文学家、水利专家。至元年间，他主持全国 27 处测影台的大规模观测，编制《授时历》，定回归年长为 365.2425 日，与现行公历精度相当。郭守敬设计简仪、高表、候极仪等多种专用仪器，简化观测操作、提高测影精度；还建造登封观星台等实物遗迹留存至今。《授时历》使用近 400 年，是中国古代历法的巅峰之一。郭守敬把「仪器创新 + 全国实测 + 精密常数」发挥到极致，体现了元代理学与国家工程结合下的天文成就高峰。',
     achievements: [
@@ -115,6 +122,7 @@ export const ASTRONOMER_TIMELINE = [
     name: '徐光启',
     era: '明末',
     dates: '1562—1633',
+    dateRange: { start: 1562, end: 1633 },
     bio:
       '徐光启，字元翰，上海县人，明末科学家、政治家。他与意大利传教士利玛窦合作翻译《几何原本》，把欧几里得几何体系引入中国；又主持编译《崇祯历书》，吸收第谷体系等西方天文模型，推动中西天文会通。徐光启主张「欲求超胜，必须会通；会通之前，先须翻译」，强调在理解西方天文学的基础上改进中国传统历算。虽然《崇祯历书》在明末未能立即颁行，但清初《时宪历》多承其成果。徐光启代表了中国天文从传统经验历算向近代天文转型的重要节点，具有科学史与文化交流的双重意义。',
     achievements: [
@@ -149,8 +157,9 @@ export function getAstronomerById(id) {
 export function timelineStats() {
   const first = ASTRONOMER_TIMELINE[0]
   const last = ASTRONOMER_TIMELINE[ASTRONOMER_TIMELINE.length - 1]
+  const fmtYear = (y) => y < 0 ? `前${Math.abs(y)}` : String(y)
   return {
     count: ASTRONOMER_TIMELINE.length,
-    span: `${first.dates.split('—')[0]} — ${last.dates.split('—')[1] ?? last.dates}`
+    span: `${fmtYear(first.dateRange.start)} — ${fmtYear(last.dateRange.end)}`
   }
 }

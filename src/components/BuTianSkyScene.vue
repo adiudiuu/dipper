@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
 import {
   CONSTELLATIONS,
   makeGalaxyBand,
@@ -245,6 +246,13 @@ function animate(now) {
 
 onMounted(async () => {
   mountedAlive = true
+
+  if (!WebGL.isWebGLAvailable()) {
+    const msg = WebGL.getWebGLErrorMessage()
+    host.value?.appendChild(msg)
+    return
+  }
+
   scene = new THREE.Scene()
   scene.fog = new THREE.FogExp2(0x0a121a, 0.0015)
   scene.background = new THREE.Color(0x080e16)
@@ -319,6 +327,22 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(animId)
   ro?.disconnect()
   controls?.dispose()
+  // 递归释放场景中所有 GPU 资源
+  if (scene) {
+    scene.traverse((child) => {
+      if (child.isMesh || child.isPoints || child.isLine) {
+        child.geometry?.dispose()
+        if (child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material]
+          mats.forEach((mat) => {
+            if (mat.map) mat.map.dispose()
+            if (mat.alphaMap) mat.alphaMap.dispose()
+            mat.dispose()
+          })
+        }
+      }
+    })
+  }
   renderer?.dispose()
   constellationMap.clear()
 })

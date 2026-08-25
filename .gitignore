@@ -31,3 +31,6 @@ _merge_backup_*/
 *.bak
 *.swp
 *~
+
+# Tooling state
+.reasonix/

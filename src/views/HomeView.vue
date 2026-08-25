@@ -32,6 +32,72 @@ const isMobileLayout = ref(typeof window !== 'undefined' && !window.matchMedia(D
 const showMobileHint = ref(false)
 const constellationMode = ref('east')
 const eastLabels = ref(true)
+const viewMode = ref('orbit')
+
+/** 观测位置预设 */
+const LOCATIONS = [
+  { name: '北京', lat: 39.9, lon: 116.4 },
+  { name: '上海', lat: 31.2, lon: 121.5 },
+  { name: '广州', lat: 23.1, lon: 113.3 },
+  { name: '成都', lat: 30.6, lon: 104.1 },
+  { name: '西安', lat: 34.3, lon: 108.9 },
+  { name: '拉萨', lat: 29.7, lon: 91.1 },
+  { name: '郑州', lat: 34.8, lon: 113.7 },
+  { name: '苏州', lat: 31.3, lon: 120.6 }
+]
+const observerLat = ref(39.9)
+const observerLon = ref(116.4)
+const observerPlace = ref('北京')
+
+/** 时间加速播放：档位（天/秒） */
+const TIME_SPEEDS = [
+  { label: '1天/秒', daysPerSec: 1 },
+  { label: '7天/秒', daysPerSec: 7 },
+  { label: '30天/秒', daysPerSec: 30 },
+  { label: '一年/秒', daysPerSec: 365 }
+]
+const timePlaying = ref(false)
+const timeSpeedIdx = ref(2)
+const timeSpeedLabel = computed(() => TIME_SPEEDS[timeSpeedIdx.value].label)
+let playRaf = 0
+let playLastT = 0
+
+function pauseTimePlay() {
+  timePlaying.value = false
+  cancelAnimationFrame(playRaf)
+  playRaf = 0
+}
+
+function toggleTimePlay() {
+  if (timePlaying.value) {
+    pauseTimePlay()
+    return
+  }
+  timePlaying.value = true
+  playLastT = performance.now()
+  playRaf = requestAnimationFrame(playTick)
+}
+
+function cycleTimeSpeed() {
+  timeSpeedIdx.value = (timeSpeedIdx.value + 1) % TIME_SPEEDS.length
+}
+
+function playTick(t) {
+  if (!timePlaying.value) return
+  const dt = Math.min(0.1, Math.max(0.001, (t - playLastT) / 1000))
+  playLastT = t
+  const days = dt * TIME_SPEEDS[timeSpeedIdx.value].daysPerSec
+  const next = currentMs.value + days * DAY_MS
+  // 播放到历法可算范围边界自动停止
+  const ny = civilOfMs(next).y
+  if (ny < 1900 || ny > 2100) {
+    pauseTimePlay()
+    return
+  }
+  setDate(next, false)
+  playRaf = requestAnimationFrame(playTick)
+}
+
 const SKY_MODES = [
   { id: 'west', label: '西象' },
   { id: 'east-core', label: '古象纲' },
@@ -134,6 +200,7 @@ function onPanelWheel(e) {
 }
 
 function goDefaults() {
+  pauseTimePlay()
   cancelAnimationFrame(inertiaId)
   scrubOriginMs.value = null
   constellationMode.value = 'east'
@@ -180,6 +247,7 @@ let inertiaId = 0
 
 function onScrub(payload) {
   if (payload.mode === 'start') {
+    pauseTimePlay()
     scrubOriginMs.value = currentMs.value
     cancelAnimationFrame(inertiaId)
     return
@@ -254,6 +322,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   cancelAnimationFrame(inertiaId)
+  cancelAnimationFrame(playRaf)
   desktopMq?.removeEventListener('change', onBreakpointChange)
   window.removeEventListener('orientationchange', onBreakpointChange)
 })
@@ -265,8 +334,20 @@ onBeforeUnmount(() => {
     <AppHeader
       v-model:constellation-mode="constellationMode"
       v-model:east-labels="eastLabels"
+      v-model:view-mode="viewMode"
       v-model:date-value="dateInputValue"
       :sky-modes="SKY_MODES"
+      :locations="LOCATIONS"
+      :observer-lat="observerLat"
+      :observer-lon="observerLon"
+      :observer-place="observerPlace"
+      :time-playing="timePlaying"
+      :time-speed-label="timeSpeedLabel"
+      @update:observer-lat="observerLat = $event"
+      @update:observer-lon="observerLon = $event"
+      @update:observer-place="observerPlace = $event"
+      @toggle-play="toggleTimePlay"
+      @cycle-speed="cycleTimeSpeed"
       @defaults="goDefaults"
       @add-days="addDays"
     />
@@ -290,6 +371,9 @@ onBeforeUnmount(() => {
         :current-term="jieqi.current.name"
         :constellation-mode="constellationMode"
         :east-labels="eastLabels"
+        :view-mode="viewMode"
+        :observer-lat="observerLat"
+        :observer-lon="observerLon"
         @scrub="onScrub"
         @culture-open="onCultureOpen"
       />
