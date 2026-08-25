@@ -27,8 +27,7 @@ const emit = defineEmits([
   'togglePlay',
   'cycleSpeed',
   'defaults',
-  'addDays',
-  'openCelestial'
+  'addDays'
 ])
 
 const route = useRoute()
@@ -294,12 +293,6 @@ onUnmounted(() => {
               >{{ timeSpeedLabel }}</button>
             </div>
             <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
-            <button
-              type="button"
-              class="btn btn-celestial"
-              title="打开历象侧栏·近期天象"
-              @click="emit('openCelestial')"
-            >天象</button>
             <label class="date-wrap" title="跳转到指定公历日期">
               <input
                 :value="dateValue"
@@ -324,13 +317,6 @@ onUnmounted(() => {
               @click="emit('addDays', 1)"
             >›</button>
           </div>
-
-          <button
-            type="button"
-            class="btn btn-celestial"
-            title="打开历象侧栏·近期天象"
-            @click="emit('openCelestial')"
-          >天象</button>
 
           <div class="more-wrap">
             <button
@@ -481,12 +467,6 @@ onUnmounted(() => {
           >{{ timeSpeedLabel }}</button>
         </div>
         <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults'); closeMore()">默认</button>
-        <button
-          type="button"
-          class="btn btn-celestial"
-          title="打开历象侧栏·近期天象"
-          @click="emit('openCelestial'); closeMore()"
-        >天象</button>
         <label class="date-wrap" title="跳转到指定公历日期">
           <input
             :value="dateValue"
@@ -729,18 +709,6 @@ onUnmounted(() => {
   border-color: rgba(184, 150, 74, 0.55);
   color: var(--dan-jin);
   background: rgba(184, 150, 74, 0.06);
-}
-
-.btn-celestial {
-  border-color: rgba(184, 150, 74, 0.38);
-  color: rgba(196, 164, 90, 0.88);
-  background: rgba(184, 150, 74, 0.08);
-}
-
-.btn-celestial:hover {
-  border-color: rgba(184, 150, 74, 0.62);
-  color: var(--dan-jin);
-  background: rgba(184, 150, 74, 0.14);
 }
 
 .nav-link {

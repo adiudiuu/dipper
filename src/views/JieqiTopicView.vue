@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
@@ -15,6 +15,33 @@ const router = useRouter()
 
 const topic = computed(() => getJieqiTopicBySlug(String(route.params.slug || '')))
 const allTopics = getAllJieqiTopics()
+
+const DEFAULT_TOPIC_DESC =
+  '二十四节气授时、历法与认星教学科普，非占卜预测。'
+
+function setMetaDescription(content) {
+  let el = document.querySelector('meta[name="description"]')
+  if (!el) {
+    el = document.createElement('meta')
+    el.setAttribute('name', 'description')
+    document.head.appendChild(el)
+  }
+  el.setAttribute('content', content)
+}
+
+watch(
+  topic,
+  (t) => {
+    if (t) {
+      document.title = `七政 · ${t.term} · ${t.title}`
+      setMetaDescription(t.summary)
+      return
+    }
+    document.title = '七政 · 节气专题'
+    setMetaDescription(DEFAULT_TOPIC_DESC)
+  },
+  { immediate: true }
+)
 
 const neighborTerms = computed(() => {
   if (!topic.value) return { prev: null, next: null }

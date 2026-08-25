@@ -28,7 +28,7 @@ import {
   phaseName
 } from '../lib/calendar.js'
 import { getFestivalsOn } from '../lib/festivals.js'
-import { enrichEvent, getEventsOn, parseDateQuery } from '../lib/celestialEvents.js'
+import { parseDateQuery } from '../lib/celestialEvents.js'
 import { formatSuiXing, resolveAsterismName } from '../lib/sky.js'
 
 const route = useRoute()
@@ -243,22 +243,6 @@ const todayFestivals = computed(() => {
   }
 })
 
-const todayCelestialEvents = computed(() => {
-  try {
-    return getEventsOn(ymd.value.y, ymd.value.m, ymd.value.d).map((ev) =>
-      enrichEvent(ev, ymd.value.y, ymd.value.m, ymd.value.d)
-    )
-  } catch {
-    return []
-  }
-})
-
-const activeCelestialHint = computed(() => {
-  const high = todayCelestialEvents.value.filter((ev) => ev.precisionLevel === 'high')
-  if (!high.length) return ''
-  return high[0].precisionNote || '本页日月食等为教学示意，非精确预报。'
-})
-
 const dateInputValue = computed({
   get() {
     const { y, m, d } = ymd.value
@@ -353,13 +337,6 @@ function dismissStarFocus() {
     delete nextQuery.star
     router.replace({ path: '/', query: nextQuery })
   }
-}
-
-function openCelestialPanel() {
-  lixiangOpen.value = true
-  nextTick(() => {
-    almanacRef.value?.scrollToCelestial?.()
-  })
 }
 
 function toggleLixiang() {
@@ -520,7 +497,6 @@ onBeforeUnmount(() => {
       @cycle-speed="cycleTimeSpeed"
       @defaults="goDefaults"
       @add-days="addDays"
-      @open-celestial="openCelestialPanel"
     />
     <button
       v-if="lixiangOpen && isMobileLayout"
@@ -574,8 +550,6 @@ onBeforeUnmount(() => {
         :phase-label="phaseLabel"
         :moon-age="moonAge"
         :today-festivals="todayFestivals"
-        :today-celestial-events="todayCelestialEvents"
-        :celestial-hint="activeCelestialHint"
         :y="ymd.y"
         :m="ymd.m"
         :d="ymd.d"

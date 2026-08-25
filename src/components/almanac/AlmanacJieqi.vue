@@ -12,9 +12,7 @@ const props = defineProps({
   phaseFrac: { type: Number, required: true },
   phaseLabel: { type: String, required: true },
   moonAge: { type: Number, required: true },
-  todayFestivals: { type: Array, default: () => [] },
-  todayCelestialEvents: { type: Array, default: () => [] },
-  celestialHint: { type: String, default: '' }
+  todayFestivals: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['open-topic'])
@@ -132,21 +130,6 @@ function openTopic() {
     </div>
     <div v-if="todayFestivals.length" class="fest-tags">
       <span v-for="f in todayFestivals" :key="f.name" class="mini-tag">{{ f.name }}</span>
-    </div>
-    <div v-if="todayCelestialEvents.length" class="celestial-today">
-      <div class="sec-label">当日天象</div>
-      <div
-        v-for="ev in todayCelestialEvents"
-        :key="ev.id"
-        class="celestial-today-row"
-      >
-        <span class="celestial-today-icon" aria-hidden="true">{{ ev.icon }}</span>
-        <span class="celestial-today-text">
-          <span class="celestial-today-name">{{ ev.name }}</span>
-          <span class="celestial-today-kind">{{ ev.typeLabel }}</span>
-        </span>
-      </div>
-      <p v-if="celestialHint" class="celestial-today-hint">{{ celestialHint }}</p>
     </div>
     <div v-if="cultureTip" class="culture-tip">
       <div class="sec-label">今日小知识</div>
@@ -313,55 +296,6 @@ function openTopic() {
 
 .fest-tags .mini-tag {
   margin-left: 0;
-}
-
-.celestial-today {
-  margin-top: 0.38rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--rule);
-}
-
-.celestial-today-row {
-  display: flex;
-  align-items: center;
-  gap: 0.38rem;
-  margin-top: 0.22rem;
-}
-
-.celestial-today-icon {
-  font-size: 0.78rem;
-  line-height: 1;
-  opacity: 0.9;
-}
-
-.celestial-today-text {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.28rem;
-}
-
-.celestial-today-name {
-  font-family: var(--font-serif);
-  font-size: 0.76rem;
-  color: var(--jin-soft);
-  letter-spacing: 0.1em;
-}
-
-.celestial-today-kind {
-  font-size: 0.5rem;
-  letter-spacing: 0.1em;
-  color: var(--qing-faint);
-  border: 1px solid rgba(110, 154, 156, 0.22);
-  padding: 0.02rem 0.2rem;
-}
-
-.celestial-today-hint {
-  margin: 0.28rem 0 0;
-  font-size: 0.48rem;
-  line-height: 1.5;
-  letter-spacing: 0.04em;
-  color: rgba(196, 140, 90, 0.68);
 }
 
 .culture-tip {
