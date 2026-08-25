@@ -1176,8 +1176,8 @@ CONSTELLATIONS.forEach(attachCulture)
 let _extraLoaded = false
 
 /**
- * 动态加载古象繁（约 283 星官），避免首次加载即解析 2844 行数据。
- * 只在切换到「古象」或「全部」模式时才会被调用。
+ * 动态加载古象繁（eastAsterisms.js，约 289 官），避免首次加载即解析大段纯数据。
+ * 只在切换到「古象」或「全部」模式时才会被调用；加载后写入 CONSTELLATIONS（幂等）。
  */
 export async function ensureExtraAsterisms() {
   if (_extraLoaded) return

@@ -299,6 +299,7 @@ function resize() {
 }
 
 function animate(now) {
+  if (!mountedAlive || !renderer) return
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   focusTarget.lerp(desiredFocus, Math.min(1, dt * 2.2))
@@ -400,6 +401,10 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(animId)
   ro?.disconnect()
   controls?.dispose()
+  if (host.value && labelRenderer?.domElement?.parentNode === host.value) {
+    host.value.removeChild(labelRenderer.domElement)
+  }
+  labelRenderer = null
   // 递归释放场景中所有 GPU 资源
   if (scene) {
     scene.traverse((child) => {
@@ -417,6 +422,7 @@ onBeforeUnmount(() => {
     })
   }
   renderer?.dispose()
+  renderer = null
   constellationMap.clear()
   eastGroup = null
   westGroup = null

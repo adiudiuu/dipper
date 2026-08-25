@@ -1,7 +1,10 @@
 /**
- * 古象·繁：传统星官示意折线（源自 d3-celestial / Stellarium 中国星空文化）
+ * 古象·繁（纯数据模块）：传统星官示意折线（源自 d3-celestial / Stellarium 中国星空文化）
  * 共 289 官（已去重二十八宿+北斗）；含明清近南极增补，并补步天歌有而仪象考成删之五官示意。
- * 示意坐标，非观测星表。与 sky.js 中 core（三垣简化+二十八宿+北斗）合并后接近陈卓体系全表量级。
+ * 示意坐标，非观测星表。
+ *
+ * 引用：仅由 sky.js → ensureExtraAsterisms() 动态 import；勿静态并入主包。
+ * 与 sky.js 中 CONSTELLATIONS 的古象 core（三垣简化+二十八宿+北斗）合并后接近陈卓体系全表量级。
  */
 export const EAST_EXTRA_ASTERISMS = [
   {

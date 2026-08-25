@@ -213,6 +213,7 @@ const SECTIONS = [
   .culture-overlay {
     align-items: flex-end;
     padding: 0;
+    padding-bottom: var(--safe-bottom);
     background: rgba(4, 8, 14, 0.58);
   }
 
@@ -221,6 +222,20 @@ const SECTIONS = [
     max-height: min(72vh, calc(100% - var(--safe-top) - 3rem));
     border-radius: 0.65rem 0.65rem 0 0;
     border-bottom: none;
+  }
+
+  .culture-close {
+    width: var(--tap-min);
+    height: var(--tap-min);
+    margin: 0;
+  }
+
+  .culture-head {
+    padding: 0.75rem 0.85rem 0.55rem;
+  }
+
+  .culture-body {
+    padding: 0.55rem 0.85rem 0.65rem;
   }
 }
 

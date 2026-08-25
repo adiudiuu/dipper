@@ -1,14 +1,17 @@
 {
   "name": "qizheng",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "七政：教学向历象观天——农历、节气与星象的 Vue 3 + Three.js 交互演示（非算命）",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "three": "^0.170.0",
@@ -16,7 +19,14 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.2.1",
-    "vite": "^6.0.7"
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "vite": "^6.0.7",
+    "vitest": "^4.1.11"
   }
 }

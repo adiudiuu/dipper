@@ -25,7 +25,9 @@ import { formatSuiXing } from '../lib/sky.js'
 const DESKTOP_MQ = '(min-width: 721px)'
 const MOBILE_HINT_KEY = 'dipper.mobileHintDismissed'
 
+/** 星空/播放用高精度时刻；历象侧栏用 panelMs（播放中节流） */
 const currentMs = ref(Date.now())
+const panelMs = ref(currentMs.value)
 const scrubOriginMs = ref(null)
 const lixiangOpen = ref(typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches)
 const isMobileLayout = ref(typeof window !== 'undefined' && !window.matchMedia(DESKTOP_MQ).matches)
@@ -49,23 +51,32 @@ const observerLat = ref(39.9)
 const observerLon = ref(116.4)
 const observerPlace = ref('北京')
 
-/** 时间加速播放：档位（天/秒） */
+/** 时间加速：天/秒；默认 1小时/秒，最高 30天/秒 */
 const TIME_SPEEDS = [
+  { label: '1小时/秒', daysPerSec: 1 / 24 },
   { label: '1天/秒', daysPerSec: 1 },
   { label: '7天/秒', daysPerSec: 7 },
-  { label: '30天/秒', daysPerSec: 30 },
-  { label: '一年/秒', daysPerSec: 365 }
+  { label: '30天/秒', daysPerSec: 30 }
 ]
+const DEFAULT_SPEED_IDX = 0
+const PANEL_THROTTLE_MS = 160
 const timePlaying = ref(false)
-const timeSpeedIdx = ref(2)
+const timeSpeedIdx = ref(DEFAULT_SPEED_IDX)
 const timeSpeedLabel = computed(() => TIME_SPEEDS[timeSpeedIdx.value].label)
 let playRaf = 0
 let playLastT = 0
+let lastPanelFlush = 0
+
+function flushPanelMs(ms = currentMs.value) {
+  panelMs.value = ms
+  lastPanelFlush = performance.now()
+}
 
 function pauseTimePlay() {
   timePlaying.value = false
   cancelAnimationFrame(playRaf)
   playRaf = 0
+  flushPanelMs()
 }
 
 function toggleTimePlay() {
@@ -88,14 +99,15 @@ watch(viewMode, (mode) => {
 
 function playTick(t) {
   if (!timePlaying.value) return
-  const dt = Math.min(0.1, Math.max(0.001, (t - playLastT) / 1000))
+  const dt = Math.min(0.05, Math.max(0.001, (t - playLastT) / 1000))
   playLastT = t
   const days = dt * TIME_SPEEDS[timeSpeedIdx.value].daysPerSec
   const next = currentMs.value + days * DAY_MS
   // 播放到历法可算范围边界自动停止
   const ny = civilOfMs(next).y
-  if (ny < 1900 || ny > 2100) {
+  if (ny < MIN_YEAR || ny > MAX_YEAR) {
     pauseTimePlay()
+    setDate(next, false)
     return
   }
   setDate(next, false)
@@ -129,13 +141,34 @@ function snapToNoon(ms) {
   return beijingDayStartMs(ymd.y, ymd.m, ymd.d) + 12 * 3600 * 1000
 }
 
-function setDate(ms, snap = true) {
-  currentMs.value = snap ? snapToNoon(ms) : ms
+/** 历法示意可靠区间（与播放边界一致） */
+const MIN_YEAR = 1900
+const MAX_YEAR = 2100
+
+function clampMsToCalendarRange(ms) {
+  const y = civilOfMs(ms).y
+  if (y < MIN_YEAR) return beijingDayStartMs(MIN_YEAR, 1, 1) + 12 * 3600 * 1000
+  if (y > MAX_YEAR) return beijingDayStartMs(MAX_YEAR, 12, 31) + 12 * 3600 * 1000
+  return ms
 }
 
-const ymd = computed(() => civilOfMs(currentMs.value))
-/** 历象读数用 currentMs 对应精确 JD（与时柱/地面播放一致，非固定正午） */
-const jd = computed(() => msToJD(currentMs.value))
+function setDate(ms, snap = true) {
+  const next = snap ? snapToNoon(ms) : ms
+  const clamped = clampMsToCalendarRange(next)
+  currentMs.value = clamped
+  // 播放中节流侧栏/历算，避免每帧 formatLunar / 节气求解拖垮帧率；星空仍跟 currentMs
+  if (!timePlaying.value || snap) {
+    flushPanelMs(clamped)
+    return
+  }
+  if (performance.now() - lastPanelFlush >= PANEL_THROTTLE_MS) {
+    flushPanelMs(clamped)
+  }
+}
+
+/** 历象侧栏与轨道日月读数：跟 panelMs（播放中约 160ms 一刷） */
+const ymd = computed(() => civilOfMs(panelMs.value))
+const jd = computed(() => msToJD(panelMs.value))
 const solarText = computed(() => formatSolar(ymd.value.y, ymd.value.m, ymd.value.d))
 
 const lunar = computed(() => {
@@ -213,6 +246,11 @@ function goDefaults() {
   scrubOriginMs.value = null
   constellationMode.value = 'east'
   eastLabels.value = true
+  viewMode.value = 'orbit'
+  observerLat.value = LOCATIONS[0].lat
+  observerLon.value = LOCATIONS[0].lon
+  observerPlace.value = LOCATIONS[0].name
+  timeSpeedIdx.value = DEFAULT_SPEED_IDX
   lixiangOpen.value = defaultLixiangOpen()
   setDate(Date.now())
   nextTick(() => {
@@ -448,7 +486,7 @@ onBeforeUnmount(() => {
 .mobile-hint {
   position: fixed;
   left: 50%;
-  bottom: calc(5.5rem + var(--safe-bottom));
+  bottom: calc(var(--app-footer-h) + 3.2rem + var(--safe-bottom));
   z-index: 25;
   transform: translateX(-50%);
   width: min(18rem, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
@@ -482,9 +520,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) and (orientation: landscape) {
   .mobile-hint {
-    bottom: calc(4.8rem + var(--safe-bottom));
+    bottom: calc(var(--app-footer-h) + 0.85rem + var(--safe-bottom));
   }
 }
 </style>

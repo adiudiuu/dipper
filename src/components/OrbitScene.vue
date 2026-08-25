@@ -147,6 +147,8 @@ let culturePickMeshes = []
 let groundHorizon = null
 let groundSceneActive = false
 let mountedAlive = false
+/** 古象繁层懒加载锁，避免快速切星象时重复 build */
+let eastExtraLoadPromise = null
 
 function openCulture(constellation) {
   if (!constellation?.culture) return
@@ -166,10 +168,23 @@ async function applyConstellationMode() {
   if (skyEastExtraGroup) skyEastExtraGroup.visible = showExtra
   // 首次需要显示古象繁时动态加载 2844 行 eastAsterisms.js
   if (showExtra && skyEastExtraGroup && skyEastExtraGroup.children.length === 0) {
-    const { ensureExtraAsterisms } = await import('../lib/sky.js')
-    await ensureExtraAsterisms()
+    if (!eastExtraLoadPromise) {
+      eastExtraLoadPromise = (async () => {
+        const { ensureExtraAsterisms } = await import('../lib/sky.js')
+        await ensureExtraAsterisms()
+        if (!mountedAlive || !skyEastExtraGroup) return
+        if (skyEastExtraGroup.children.length === 0) {
+          buildConstellationLayer(skyEastExtraGroup, 'east', 'extra')
+        }
+      })().finally(() => {
+        /* 加载失败时允许重试 */
+        if (!skyEastExtraGroup || skyEastExtraGroup.children.length === 0) {
+          eastExtraLoadPromise = null
+        }
+      })
+    }
+    await eastExtraLoadPromise
     if (!mountedAlive) return
-    buildConstellationLayer(skyEastExtraGroup, 'east', 'extra')
   }
   applyEastLabels()
 }
@@ -407,6 +422,13 @@ function localLstDeg() {
 
 function syncOrbits() {
   if (!earthOrbit || !moon) return
+
+  // 地面：天球恒星时在 animate 里按 currentMs 连续更新；此处只刷节气高亮
+  if (props.viewMode === 'ground') {
+    highlightTerm(props.currentTerm)
+    return
+  }
+
   const earthAng = (props.sunLon + 180) * DEG
   const earthPos = eclipticPos(EARTH_ORBIT_R, earthAng)
   earthOrbit.position.set(earthPos.x, 0, earthPos.z)
@@ -436,14 +458,14 @@ function syncOrbits() {
   }
   highlightTerm(props.currentTerm)
 
-  // 地景视角：天球绕 Y 转恒星时（对好子午线），再绕 X 倾转使北天极指向北方地平线上方 φ°（纬度生效）
-  // 旋转基准：天顶方向（世界 +Y）的赤经恰为当地恒星时 LST
-  if (skyDome && props.viewMode === 'ground') {
-    const lst = localLstDeg()
-    skyDome.rotation.set((props.observerLat - 90) * DEG, (lst - 90) * DEG, 0)
-  } else if (skyDome) {
-    skyDome.rotation.set(0, 0, 0)
-  }
+  if (skyDome) skyDome.rotation.set(0, 0, 0)
+}
+
+/** 地面视角：每渲染帧按精确时刻更新天球，播放加速时连续丝滑 */
+function syncGroundSky() {
+  if (!skyDome || !groundSceneActive) return
+  const lst = localLstDeg()
+  skyDome.rotation.set((props.observerLat - 90) * DEG, (lst - 90) * DEG, 0)
 }
 
 function highlightTerm(name) {
@@ -473,6 +495,7 @@ function resize() {
 }
 
 function animate(now) {
+  if (!mountedAlive || !renderer) return
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   simTime += dt
@@ -507,6 +530,7 @@ function animate(now) {
     })
   }
   controls?.update()
+  syncGroundSky()
   updateGroundHud()
   renderer.render(scene, camera)
   labelRenderer?.render(scene, camera)
@@ -1131,7 +1155,8 @@ onBeforeUnmount(() => {
   renderer?.dispose()
 })
 
-watch(() => [props.sunLon, props.moonAge, props.currentMs, props.currentTerm, props.observerLat, props.observerLon], syncOrbits)
+watch(() => [props.sunLon, props.moonAge, props.currentTerm, props.observerLat, props.observerLon], syncOrbits)
+// 地面 currentMs → animate 内 syncGroundSky；轨道行星跟 sunLon/moonAge/日期读数
 watch(() => props.constellationMode, applyConstellationMode)
 watch(() => props.eastLabels, applyEastLabels)
 watch(() => props.viewMode, (_new, _old) => { applyViewMode() })
@@ -1516,14 +1541,32 @@ function updateGroundHud() {
 
 @media (max-width: 720px) {
   .ground-hud {
-    bottom: calc(2.55rem + var(--safe-bottom, 0px));
+    /* 抬过 AppFooter，并与左侧历象轨错开中心偏上 */
+    bottom: calc(var(--app-footer-h, 2.4rem) + 0.75rem + var(--safe-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
   }
   .hud-svg {
-    width: 4.9rem;
-    height: 4.9rem;
+    width: 4.4rem;
+    height: 4.4rem;
   }
   .hud-readout {
-    font-size: 0.56rem;
+    font-size: 0.54rem;
+    padding: 0.16rem 0.45rem;
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .ground-hud {
+    left: calc(0.7rem + var(--safe-left, 0px));
+    right: auto;
+    bottom: calc(var(--app-footer-h, 2.4rem) + 0.35rem + var(--safe-bottom, 0px));
+    transform: none;
+    align-items: flex-start;
+  }
+  .hud-svg {
+    width: 3.8rem;
+    height: 3.8rem;
   }
 }
 </style>

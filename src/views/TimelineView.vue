@@ -587,20 +587,110 @@ function stepEntry(delta) {
   .timeline-main {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.45rem;
+    padding:
+      0.2rem
+      calc(0.55rem + var(--safe-right))
+      0.2rem
+      calc(0.55rem + var(--safe-left));
   }
 
   .intro-panel {
-    max-height: 11.5rem;
-    padding: 0.55rem 0.65rem;
+    max-height: none;
+    padding: 0.55rem 0.6rem 0.45rem;
+    gap: 0.45rem;
+    overflow: visible;
+  }
+
+  .intro-text {
+    font-size: 0.64rem;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .era-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.1rem;
+  }
+
+  .era-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .era-chip {
+    flex: 0 0 auto;
+    min-height: var(--tap-min, 2.75rem);
+    padding: 0.35rem 0.65rem;
+    font-size: 0.6rem;
   }
 
   .name-roll {
+    flex: 0 0 auto;
     min-height: 0;
+    border-top: 1px solid rgba(90, 138, 140, 0.14);
+    padding-top: 0.4rem;
+  }
+
+  .name-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-height: none;
+    padding-bottom: 0.15rem;
+  }
+
+  .name-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .name-list li {
+    flex: 0 0 auto;
+  }
+
+  .name-btn {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.12rem;
+    min-width: 4.6rem;
+    min-height: var(--tap-min, 2.75rem);
+    padding: 0.4rem 0.55rem;
+    border: 1px solid rgba(90, 138, 140, 0.18);
+    border-bottom: 1px solid rgba(90, 138, 140, 0.18);
+    border-radius: 0.35rem;
+    background: rgba(14, 22, 32, 0.45);
+  }
+
+  .name-btn.active {
+    border-color: rgba(184, 150, 74, 0.45);
+  }
+
+  .name-btn-name {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+  }
+
+  .timeline-track {
+    min-height: 0;
+    padding: 0.4rem 0.45rem 0.5rem;
   }
 
   .node-head {
     grid-template-columns: 1fr auto;
     grid-template-rows: auto auto;
+    min-height: var(--tap-min, 2.75rem);
+    padding: 0.55rem 0.6rem;
   }
 
   .node-dates {
@@ -612,10 +702,48 @@ function stepEntry(delta) {
     grid-column: 2;
     grid-row: 1 / span 2;
     align-self: center;
+    min-width: var(--tap-min, 2.75rem);
+    min-height: var(--tap-min, 2.75rem);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .node-bio {
     font-size: 0.72rem;
+  }
+
+  .page-foot {
+    padding:
+      0.22rem
+      calc(0.7rem + var(--safe-right))
+      calc(0.35rem + var(--app-footer-h, 2.4rem))
+      calc(0.7rem + var(--safe-left));
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .timeline-main {
+    grid-template-columns: min(12rem, 38vw) 1fr;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .intro-text {
+    -webkit-line-clamp: 3;
+  }
+
+  .name-list {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: min(40vh, 12rem);
+  }
+
+  .name-btn {
+    flex-direction: row;
+    align-items: baseline;
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

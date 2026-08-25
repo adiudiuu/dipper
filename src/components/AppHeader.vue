@@ -13,7 +13,7 @@ const props = defineProps({
   observerLon: { type: Number, default: 116.4 },
   observerPlace: { type: String, default: '北京' },
   timePlaying: { type: Boolean, default: false },
-  timeSpeedLabel: { type: String, default: '30日/秒' }
+  timeSpeedLabel: { type: String, default: '1小时/秒' }
 })
 
 const emit = defineEmits([
@@ -191,7 +191,7 @@ onUnmounted(() => {
           <button
             type="button"
             class="loc-btn"
-            :title="`观测位置：${observerPlace} (${observerLat}°N, ${observerLon}°E)`"
+            :title="`观测位置：${observerPlace}`"
             @click="toggleLocation"
           >
             <span class="loc-icon">&#9678;</span>
@@ -455,6 +455,14 @@ onUnmounted(() => {
   margin-left: 0.15rem;
 }
 
+.view-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgba(90, 138, 140, 0.22);
+  background: rgba(14, 22, 32, 0.55);
+  height: 2.05rem;
+}
+
 .day-nav {
   display: none;
   align-items: stretch;
@@ -565,88 +573,144 @@ onUnmounted(() => {
 
 @media (max-width: 720px) {
   .site-header {
-    gap: 0.45rem;
+    gap: 0.4rem;
     padding:
-      calc(0.72rem + var(--safe-top))
-      calc(0.85rem + var(--safe-right))
-      0.55rem
-      calc(0.85rem + var(--safe-left));
+      calc(0.62rem + var(--safe-top))
+      calc(0.75rem + var(--safe-right))
+      0.45rem
+      calc(0.75rem + var(--safe-left));
   }
 
   .topbar-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.55rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.65rem;
   }
 
   .brand h1 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
 
   .brand .sub {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
+  }
+
+  .brand-logo {
+    width: 2rem;
+    height: 2rem;
   }
 
   .main-nav {
-    margin-left: 0;
-    width: 100%;
+    margin-left: auto;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
   }
 
   .nav-link {
     flex: 1 1 0;
     min-width: 0;
+    max-width: 5.5rem;
   }
 
   .tools-row {
     width: 100%;
     min-height: auto;
-    gap: 0.45rem;
-  }
-
-  .sky-mode,
-  .sky-mode-labels {
-    flex: 1 1 auto;
-    min-width: 0;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding-bottom: 0.12rem;
+    overscroll-behavior-x: contain;
   }
 
-  .sky-mode::-webkit-scrollbar,
-  .sky-mode-labels::-webkit-scrollbar {
+  .tools-row::-webkit-scrollbar {
     display: none;
   }
 
   .sky-mode,
   .sky-mode-labels,
-  .day-nav {
+  .view-toggle,
+  .day-nav,
+  .time-play,
+  .loc-wrap,
+  .btn,
+  .date-wrap {
+    flex: 0 0 auto;
+  }
+
+  .sky-mode,
+  .sky-mode-labels,
+  .view-toggle,
+  .day-nav,
+  .time-play {
+    height: auto;
     min-height: var(--tap-min);
   }
 
   .sky-mode-btn,
   .day-nav-btn,
+  .time-play-btn,
   .btn,
-  .nav-link {
+  .nav-link,
+  .loc-btn {
     min-width: var(--tap-min);
     min-height: var(--tap-min);
     height: auto;
   }
 
-  .sky-mode-btn {
+  .sky-mode-btn,
+  .time-play-btn {
     flex: 0 0 auto;
     white-space: nowrap;
-    font-size: 0.68rem;
-    padding: 0 0.72rem;
+    font-size: 0.66rem;
+    padding: 0 0.68rem;
   }
 
   .day-nav {
     display: inline-flex;
   }
 
-  .date-wrap {
-    flex: 1 1 auto;
+  .loc-btn {
+    height: auto;
+    padding: 0 0.65rem;
+  }
+
+  .loc-name {
+    max-width: 4.2em;
+  }
+
+  .loc-popover {
+    position: fixed;
+    top: auto;
+    right: calc(0.75rem + var(--safe-right));
+    left: calc(0.75rem + var(--safe-left));
+    bottom: calc(var(--app-footer-h) + 0.65rem + var(--safe-bottom));
     min-width: 0;
+    width: auto;
+    max-height: min(70vh, calc(100dvh - 6rem - var(--safe-top) - var(--safe-bottom)));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .loc-preset-btn,
+  .loc-apply,
+  .loc-my {
+    min-height: var(--tap-min);
+    padding: 0.45rem 0.7rem;
+  }
+
+  .loc-input {
+    min-height: var(--tap-min);
+    width: 5.5em;
+    font-size: 0.78rem;
+  }
+
+  .date-wrap {
+    min-width: 8.5rem;
   }
 
   .date-wrap input[type='date'] {
@@ -670,6 +734,25 @@ onUnmounted(() => {
     font-size: 0.62rem;
     letter-spacing: 0.08em;
     padding: 0.38rem 0.55rem;
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .site-header {
+    gap: 0.28rem;
+    padding:
+      calc(0.35rem + var(--safe-top))
+      calc(0.65rem + var(--safe-right))
+      0.28rem
+      calc(0.65rem + var(--safe-left));
+  }
+
+  .brand .sub {
+    display: none;
+  }
+
+  .tools-row {
+    gap: 0.32rem;
   }
 }
 
@@ -887,5 +970,58 @@ onUnmounted(() => {
 
 .time-play-speed:hover {
   color: rgba(160, 208, 196, 0.95);
+}
+
+/* 选点/播放控件的窄屏覆盖须在基础规则之后 */
+@media (max-width: 720px) {
+  .loc-btn {
+    height: auto;
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    padding: 0 0.65rem;
+  }
+
+  .loc-name {
+    max-width: 4.2em;
+  }
+
+  .loc-popover {
+    position: fixed;
+    top: auto;
+    right: calc(0.75rem + var(--safe-right));
+    left: calc(0.75rem + var(--safe-left));
+    bottom: calc(var(--app-footer-h) + 0.65rem + var(--safe-bottom));
+    min-width: 0;
+    width: auto;
+    max-height: min(70vh, calc(100dvh - 6rem - var(--safe-top) - var(--safe-bottom)));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    z-index: 100;
+  }
+
+  .loc-preset-btn,
+  .loc-apply,
+  .loc-my {
+    min-height: var(--tap-min);
+    padding: 0.45rem 0.7rem;
+  }
+
+  .loc-input {
+    min-height: var(--tap-min);
+    width: 5.5em;
+    font-size: 0.78rem;
+  }
+
+  .time-play {
+    height: auto;
+    min-height: var(--tap-min);
+  }
+
+  .time-play-btn {
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    padding: 0 0.68rem;
+    font-size: 0.66rem;
+  }
 }
 </style>

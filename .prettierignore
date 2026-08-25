@@ -1,0 +1,6 @@
+dist
+node_modules
+public
+package-lock.json
+src/lib/eastAsterisms.js
+src/lib/sky.js

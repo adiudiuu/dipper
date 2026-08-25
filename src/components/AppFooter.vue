@@ -126,14 +126,16 @@ const versionLabel = `v${version}`
   opacity: 0.9;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .site-footer {
+    z-index: 30;
     padding:
-      0.32rem
-      calc(0.75rem + var(--safe-right))
-      calc(0.32rem + var(--safe-bottom))
-      calc(0.75rem + var(--safe-left));
-    gap: 0.35rem;
+      0.28rem
+      calc(0.7rem + var(--safe-right))
+      calc(0.28rem + var(--safe-bottom))
+      calc(0.7rem + var(--safe-left));
+    gap: 0.3rem;
+    flex-wrap: nowrap;
   }
 
   .foot-sub {
@@ -141,16 +143,18 @@ const versionLabel = `v${version}`
   }
 
   .foot-name {
-    font-size: 0.66rem;
+    font-size: 0.64rem;
   }
 
   .foot-version {
-    font-size: 0.48rem;
+    font-size: 0.46rem;
   }
 
   .foot-link {
     font-size: 0.52rem;
     letter-spacing: 0.1em;
+    min-height: var(--tap-min);
+    padding: 0.2rem 0.15rem;
   }
 }
 </style>

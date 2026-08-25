@@ -270,18 +270,34 @@ defineExpose({ resetFestivals })
   .lixiang {
     --rail-w: 2.75rem;
     --panel-w: min(16.5rem, calc(100vw - 1.3rem - var(--rail-w) - var(--safe-right)));
+    --lixiang-bottom: calc(var(--app-footer-h) + 0.35rem + var(--safe-bottom));
     position: fixed;
     z-index: 25;
     right: calc(0.65rem + var(--safe-right));
     left: auto;
     top: auto;
-    bottom: calc(0.55rem + var(--safe-bottom));
-    height: min(52vh, calc(100% - 1.1rem - var(--safe-bottom)));
-    max-height: min(52vh, calc(100% - 1.1rem - var(--safe-bottom)));
+    bottom: var(--lixiang-bottom);
+    height: min(48vh, calc(100dvh - var(--lixiang-bottom) - 4.5rem - var(--safe-top)));
+    max-height: min(48vh, calc(100dvh - var(--lixiang-bottom) - 4.5rem - var(--safe-top)));
     border-radius: 0.55rem 0 0 0.55rem;
     box-shadow:
       0 -4px 24px rgba(0, 0, 0, 0.28),
       0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  /* 收起时靠左，避开右下角 GitHub */
+  .lixiang.collapsed {
+    right: auto;
+    left: calc(0.55rem + var(--safe-left));
+    border-radius: 0 0.55rem 0.55rem 0;
+    height: auto;
+    max-height: none;
+    min-height: 5.5rem;
+  }
+
+  .lixiang.collapsed .lixiang-rail {
+    border-right: none;
+    border-left: none;
   }
 
   .lixiang-rail {
@@ -301,6 +317,19 @@ defineExpose({ resetFestivals })
     left: calc(0.45rem + var(--safe-left));
     right: calc(0.45rem + var(--safe-right));
     width: auto;
+    height: min(55vh, calc(100dvh - var(--lixiang-bottom) - 4.2rem - var(--safe-top)));
+    max-height: min(55vh, calc(100dvh - var(--lixiang-bottom) - 4.2rem - var(--safe-top)));
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .lixiang:not(.collapsed) {
+    height: min(78vh, calc(100dvh - var(--lixiang-bottom) - 2.8rem - var(--safe-top)));
+    max-height: min(78vh, calc(100dvh - var(--lixiang-bottom) - 2.8rem - var(--safe-top)));
+    --panel-w: min(18rem, calc(50vw - 1rem));
+    left: auto;
+    right: calc(0.45rem + var(--safe-right));
+    width: calc(var(--rail-w) + var(--panel-w));
   }
 }
 </style>

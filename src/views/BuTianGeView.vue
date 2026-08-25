@@ -33,6 +33,14 @@ const scrollSyncLock = ref(false)
 /** 全部模式下最近一次点选侧：east | west */
 const focusSide = ref('east')
 
+const MOBILE_MQ = '(max-width: 720px)'
+const isMobileLayout = ref(typeof window !== 'undefined' && window.matchMedia(MOBILE_MQ).matches)
+/** 手机端：星空 | 歌诀 面板切换 */
+const mobilePane = ref('sky')
+
+let mobileMq
+let onMobileMqChange
+
 const stats = buTianGeStats()
 const showEastPanel = computed(() => constellationMode.value !== 'west')
 const showWestPanel = computed(() => constellationMode.value !== 'east')
@@ -207,6 +215,13 @@ watch(showEastPanel, (show) => {
 let observer = null
 
 onMounted(() => {
+  mobileMq = window.matchMedia(MOBILE_MQ)
+  isMobileLayout.value = mobileMq.matches
+  onMobileMqChange = () => {
+    isMobileLayout.value = mobileMq.matches
+  }
+  mobileMq.addEventListener('change', onMobileMqChange)
+
   observer = new IntersectionObserver(
     (entries) => {
       if (scrollSyncLock.value || !showEastPanel.value) return
@@ -235,6 +250,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  mobileMq?.removeEventListener('change', onMobileMqChange)
   observer?.disconnect()
 })
 </script>
@@ -248,7 +264,38 @@ onBeforeUnmount(() => {
       :sky-modes="SKY_MODES"
     />
 
-    <main class="split-layout">
+    <div
+      v-if="isMobileLayout"
+      class="mobile-pane-tabs"
+      role="tablist"
+      aria-label="列宿面板"
+    >
+      <button
+        type="button"
+        role="tab"
+        class="pane-tab"
+        :class="{ active: mobilePane === 'sky' }"
+        :aria-selected="mobilePane === 'sky'"
+        @click="mobilePane = 'sky'"
+      >星空</button>
+      <button
+        type="button"
+        role="tab"
+        class="pane-tab"
+        :class="{ active: mobilePane === 'lyrics' }"
+        :aria-selected="mobilePane === 'lyrics'"
+        @click="mobilePane = 'lyrics'"
+      >{{ constellationMode === 'west' ? '星座' : constellationMode === 'all' ? '说明' : '歌诀' }}</button>
+    </div>
+
+    <main
+      class="split-layout"
+      :class="{
+        'is-mobile': isMobileLayout,
+        'pane-sky': isMobileLayout && mobilePane === 'sky',
+        'pane-lyrics': isMobileLayout && mobilePane === 'lyrics'
+      }"
+    >
       <section
         class="sky-panel glass-panel"
         :aria-label="skyPanelAria"
@@ -442,7 +489,15 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
   gap: 0.75rem;
-  padding: 0.65rem 0.85rem 0.85rem;
+  padding:
+    0.65rem
+    calc(0.85rem + var(--safe-right))
+    calc(0.55rem + var(--app-footer-h))
+    calc(0.85rem + var(--safe-left));
+}
+
+.mobile-pane-tabs {
+  display: none;
 }
 
 .sky-panel {
@@ -687,6 +742,104 @@ onBeforeUnmount(() => {
   .split-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(14rem, 42vh) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .mobile-pane-tabs {
+    display: flex;
+    position: relative;
+    z-index: 2;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    padding:
+      0.15rem
+      calc(0.75rem + var(--safe-right))
+      0.35rem
+      calc(0.75rem + var(--safe-left));
+  }
+
+  .pane-tab {
+    appearance: none;
+    flex: 1 1 0;
+    min-height: var(--tap-min);
+    border: 1px solid rgba(90, 138, 140, 0.28);
+    background: rgba(14, 22, 32, 0.55);
+    color: rgba(201, 194, 176, 0.62);
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+    transition: color 0.18s, border-color 0.18s, background 0.18s;
+  }
+
+  .pane-tab.active {
+    color: var(--dan-jin, #c4a45a);
+    border-color: rgba(184, 150, 74, 0.5);
+    background: rgba(184, 150, 74, 0.1);
+  }
+
+  .split-layout.is-mobile {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    padding:
+      0.2rem
+      calc(0.65rem + var(--safe-right))
+      calc(0.4rem + var(--app-footer-h))
+      calc(0.65rem + var(--safe-left));
+  }
+
+  .split-layout.is-mobile .sky-panel,
+  .split-layout.is-mobile .lyrics-panel {
+    grid-area: 1 / 1;
+    min-height: 0;
+    height: 100%;
+  }
+
+  /* 叠层切换：保星空画布尺寸，勿 display:none */
+  .split-layout.is-mobile.pane-sky .lyrics-panel,
+  .split-layout.is-mobile.pane-lyrics .sky-panel {
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .split-layout.is-mobile.pane-sky .sky-panel,
+  .split-layout.is-mobile.pane-lyrics .lyrics-panel {
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 1;
+  }
+
+  .nav-btn {
+    width: var(--tap-min);
+    height: var(--tap-min);
+    font-size: 1.1rem;
+  }
+
+  .lyric-line {
+    min-height: var(--tap-min);
+    padding: 0.65rem 0.7rem;
+  }
+
+  .lyrics-head {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .sky-caption {
+    left: 0.45rem;
+    right: 0.45rem;
+    bottom: 0.45rem;
+    max-width: none;
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .split-layout.is-mobile {
+    padding-bottom: calc(0.3rem + var(--app-footer-h));
   }
 }
 </style>

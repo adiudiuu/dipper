@@ -162,3 +162,16 @@ input[type='date'] {
 input[type='date']::-webkit-date-and-time-value {
   text-align: left;
 }
+
+@media (max-width: 720px) {
+  :root {
+    --app-footer-h: 2.55rem;
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  :root {
+    --app-footer-h: 2.15rem;
+    --tap-min: 40px;
+  }
+}
