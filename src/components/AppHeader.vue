@@ -47,10 +47,25 @@ function isNavActive(path) {
   return route.path.startsWith(path)
 }
 
+const NARROW_MQ = '(max-width: 720px)'
+const isNarrow = ref(typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches)
+const moreOpen = ref(false)
 const locationOpen = ref(false)
 const customLat = ref(props.observerLat)
 const customLon = ref(props.observerLon)
 const hasGeolocation = typeof navigator !== 'undefined' && !!navigator.geolocation
+
+let narrowMq
+let onNarrowMqChange
+
+function closeMore() {
+  moreOpen.value = false
+}
+
+function toggleMore() {
+  moreOpen.value = !moreOpen.value
+  if (!moreOpen.value) locationOpen.value = false
+}
 
 function selectLocation(loc) {
   emit('update:observerLat', loc.lat)
@@ -98,14 +113,27 @@ function onDocClick(e) {
   if (locationOpen.value && !e.target.closest('.loc-wrap')) {
     locationOpen.value = false
   }
+  if (moreOpen.value && !e.target.closest('.more-wrap') && !e.target.closest('.more-panel')) {
+    moreOpen.value = false
+  }
 }
 
 onMounted(() => {
   document.addEventListener('click', onDocClick)
+  narrowMq = window.matchMedia(NARROW_MQ)
+  isNarrow.value = narrowMq.matches
+  onNarrowMqChange = () => {
+    isNarrow.value = narrowMq.matches
+    if (!narrowMq.matches) {
+      moreOpen.value = false
+    }
+  }
+  narrowMq.addEventListener('change', onNarrowMqChange)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
+  narrowMq?.removeEventListener('change', onNarrowMqChange)
 })
 </script>
 
@@ -134,43 +162,220 @@ onUnmounted(() => {
     </div>
 
     <div v-if="showToolsRow" class="tools-row">
-      <template v-if="isHome">
-        <div class="sky-mode" role="group" aria-label="星象层">
-          <button
-            v-for="m in skyModes"
-            :key="m.id"
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: constellationMode === m.id }"
-            :aria-pressed="constellationMode === m.id"
-            @click="emit('update:constellationMode', m.id)"
-          >{{ m.label }}</button>
-        </div>
-        <div
-          class="sky-mode sky-mode-labels"
-          role="group"
-          aria-label="星官之名"
-        >
-          <button
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: eastLabels }"
-            :aria-pressed="eastLabels"
-            title="显示星官之名"
-            aria-label="显示星官之名"
-            @click="emit('update:eastLabels', true)"
-          >题名</button>
-          <button
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: !eastLabels }"
-            :aria-pressed="!eastLabels"
-            title="隐藏星官之名"
-            aria-label="隐藏星官之名"
-            @click="emit('update:eastLabels', false)"
-          >隐名</button>
-        </div>
+      <div class="tools-scroll">
+        <template v-if="isHome">
+          <div class="sky-mode" role="group" aria-label="星象层">
+            <button
+              v-for="m in skyModes"
+              :key="m.id"
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: constellationMode === m.id }"
+              :aria-pressed="constellationMode === m.id"
+              @click="emit('update:constellationMode', m.id)"
+            >{{ m.label }}</button>
+          </div>
+          <div
+            class="sky-mode sky-mode-labels"
+            role="group"
+            aria-label="星官之名"
+          >
+            <button
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: eastLabels }"
+              :aria-pressed="eastLabels"
+              title="显示星官之名"
+              aria-label="显示星官之名"
+              @click="emit('update:eastLabels', true)"
+            >题名</button>
+            <button
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: !eastLabels }"
+              :aria-pressed="!eastLabels"
+              title="隐藏星官之名"
+              aria-label="隐藏星官之名"
+              @click="emit('update:eastLabels', false)"
+            >隐名</button>
+          </div>
 
+          <!-- 桌面：次要工具内联；窄屏收入「更多」面板 -->
+          <div v-if="!isNarrow" class="tools-secondary tools-secondary--inline">
+            <div class="view-toggle" role="group" aria-label="视角">
+              <button
+                type="button"
+                class="sky-mode-btn"
+                :class="{ active: viewMode === 'orbit' }"
+                :aria-pressed="viewMode === 'orbit'"
+                @click="emit('update:viewMode', 'orbit')"
+              >轨道</button>
+              <button
+                type="button"
+                class="sky-mode-btn"
+                :class="{ active: viewMode === 'ground' }"
+                :aria-pressed="viewMode === 'ground'"
+                @click="emit('update:viewMode', 'ground')"
+              >地面</button>
+            </div>
+            <div v-if="viewMode === 'ground'" class="loc-wrap">
+              <button
+                type="button"
+                class="loc-btn"
+                :title="`观测位置：${observerPlace}`"
+                @click="toggleLocation"
+              >
+                <span class="loc-icon">&#9678;</span>
+                <span class="loc-name">{{ observerPlace }}</span>
+              </button>
+              <div v-if="locationOpen" class="loc-popover">
+                <div class="loc-section">
+                  <div class="loc-section-title">预设城市</div>
+                  <div class="loc-presets">
+                    <button
+                      v-for="loc in locations"
+                      :key="loc.name"
+                      type="button"
+                      class="loc-preset-btn"
+                      :class="{ active: observerPlace === loc.name }"
+                      @click="selectLocation(loc)"
+                    >{{ loc.name }}</button>
+                  </div>
+                </div>
+                <div class="loc-section">
+                  <div class="loc-section-title">自定义</div>
+                  <div class="loc-custom">
+                    <label class="loc-field">
+                      <span>纬度</span>
+                      <input
+                        v-model.number="customLat"
+                        type="number"
+                        min="-90" max="90" step="0.1"
+                        class="loc-input"
+                        placeholder="39.9"
+                      >
+                    </label>
+                    <label class="loc-field">
+                      <span>经度</span>
+                      <input
+                        v-model.number="customLon"
+                        type="number"
+                        min="-180" max="180" step="0.1"
+                        class="loc-input"
+                        placeholder="116.4"
+                      >
+                    </label>
+                    <button type="button" class="loc-apply" @click="applyCustomLocation">应用</button>
+                  </div>
+                </div>
+                <button
+                  v-if="hasGeolocation"
+                  type="button"
+                  class="loc-my"
+                  @click="useMyLocation"
+                >使用当前位置</button>
+              </div>
+            </div>
+            <div v-if="viewMode === 'ground'" class="time-play" role="group" aria-label="时间加速播放">
+              <button
+                type="button"
+                class="time-play-btn"
+                :class="{ active: timePlaying }"
+                :aria-pressed="timePlaying"
+                :title="timePlaying ? '暂停时间加速' : '开始时间加速'"
+                @click="emit('togglePlay')"
+              >{{ timePlaying ? '暂停' : '播放' }}</button>
+              <button
+                type="button"
+                class="time-play-btn time-play-speed"
+                :title="`加速速度：${timeSpeedLabel}（点击切换）`"
+                @click="emit('cycleSpeed')"
+              >{{ timeSpeedLabel }}</button>
+            </div>
+            <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
+            <label class="date-wrap" title="跳转到指定公历日期">
+              <input
+                :value="dateValue"
+                type="date"
+                aria-label="选择公历日期"
+                @input="emit('update:dateValue', $event.target.value)"
+              >
+            </label>
+          </div>
+
+          <div class="day-nav day-nav--mobile" role="group" aria-label="换日">
+            <button
+              type="button"
+              class="day-nav-btn"
+              aria-label="上一日"
+              @click="emit('addDays', -1)"
+            >‹</button>
+            <button
+              type="button"
+              class="day-nav-btn"
+              aria-label="下一日"
+              @click="emit('addDays', 1)"
+            >›</button>
+          </div>
+
+          <div class="more-wrap">
+            <button
+              type="button"
+              class="more-btn"
+              :class="{ active: moreOpen }"
+              :aria-expanded="moreOpen"
+              aria-controls="header-more-panel"
+              @click.stop="toggleMore"
+            >{{ moreOpen ? '收起' : '更多' }}</button>
+          </div>
+        </template>
+
+        <template v-else-if="isBuTianGe">
+          <div class="sky-mode" role="group" aria-label="星象层">
+            <button
+              v-for="m in skyModes"
+              :key="m.id"
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: constellationMode === m.id }"
+              :aria-pressed="constellationMode === m.id"
+              @click="emit('update:constellationMode', m.id)"
+            >{{ m.label }}</button>
+          </div>
+          <div
+            class="sky-mode sky-mode-labels"
+            role="group"
+            aria-label="星官之名"
+          >
+            <button
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: eastLabels }"
+              :aria-pressed="eastLabels"
+              title="显示星官之名"
+              aria-label="显示星官之名"
+              @click="emit('update:eastLabels', true)"
+            >题名</button>
+            <button
+              type="button"
+              class="sky-mode-btn"
+              :class="{ active: !eastLabels }"
+              :aria-pressed="!eastLabels"
+              title="隐藏星官之名"
+              aria-label="隐藏星官之名"
+              @click="emit('update:eastLabels', false)"
+            >隐名</button>
+          </div>
+        </template>
+      </div>
+
+      <div
+        v-if="isHome && isNarrow && moreOpen"
+        id="header-more-panel"
+        class="more-panel"
+        role="region"
+        aria-label="更多工具"
+      >
         <div class="view-toggle" role="group" aria-label="视角">
           <button
             type="button"
@@ -261,21 +466,7 @@ onUnmounted(() => {
             @click="emit('cycleSpeed')"
           >{{ timeSpeedLabel }}</button>
         </div>
-        <div class="day-nav" role="group" aria-label="换日">
-          <button
-            type="button"
-            class="day-nav-btn"
-            aria-label="上一日"
-            @click="emit('addDays', -1)"
-          >‹</button>
-          <button
-            type="button"
-            class="day-nav-btn"
-            aria-label="下一日"
-            @click="emit('addDays', 1)"
-          >›</button>
-        </div>
-        <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults')">默认</button>
+        <button type="button" class="btn" title="恢复全部初始状态" @click="emit('defaults'); closeMore()">默认</button>
         <label class="date-wrap" title="跳转到指定公历日期">
           <input
             :value="dateValue"
@@ -284,45 +475,7 @@ onUnmounted(() => {
             @input="emit('update:dateValue', $event.target.value)"
           >
         </label>
-      </template>
-
-      <template v-else-if="isBuTianGe">
-        <div class="sky-mode" role="group" aria-label="星象层">
-          <button
-            v-for="m in skyModes"
-            :key="m.id"
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: constellationMode === m.id }"
-            :aria-pressed="constellationMode === m.id"
-            @click="emit('update:constellationMode', m.id)"
-          >{{ m.label }}</button>
-        </div>
-        <div
-          class="sky-mode sky-mode-labels"
-          role="group"
-          aria-label="星官之名"
-        >
-          <button
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: eastLabels }"
-            :aria-pressed="eastLabels"
-            title="显示星官之名"
-            aria-label="显示星官之名"
-            @click="emit('update:eastLabels', true)"
-          >题名</button>
-          <button
-            type="button"
-            class="sky-mode-btn"
-            :class="{ active: !eastLabels }"
-            :aria-pressed="!eastLabels"
-            title="隐藏星官之名"
-            aria-label="隐藏星官之名"
-            @click="emit('update:eastLabels', false)"
-          >隐名</button>
-        </div>
-      </template>
+      </div>
     </div>
   </header>
 </template>
@@ -408,11 +561,57 @@ onUnmounted(() => {
 
 .tools-row {
   display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: stretch;
+  min-height: 2.05rem;
+  padding-top: 0.05rem;
+}
+
+.tools-scroll {
+  display: flex;
   gap: 0.55rem;
   flex-wrap: wrap;
   align-items: center;
   min-height: 2.05rem;
-  padding-top: 0.05rem;
+}
+
+.tools-secondary {
+  display: inline-flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.day-nav--mobile {
+  display: none;
+}
+
+.more-wrap {
+  display: none;
+}
+
+.more-btn {
+  appearance: none;
+  border: 1px solid rgba(184, 150, 74, 0.4);
+  background: rgba(184, 150, 74, 0.08);
+  color: var(--dan-jin);
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  padding: 0 0.75rem;
+  height: 2.05rem;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+
+.more-btn.active {
+  border-color: rgba(184, 150, 74, 0.65);
+  background: rgba(184, 150, 74, 0.16);
+}
+
+.more-panel {
+  display: none;
 }
 
 .sky-mode {
@@ -573,61 +772,87 @@ onUnmounted(() => {
 
 @media (max-width: 720px) {
   .site-header {
-    gap: 0.4rem;
+    gap: 0.35rem;
     padding:
-      calc(0.62rem + var(--safe-top))
-      calc(0.75rem + var(--safe-right))
-      0.45rem
-      calc(0.75rem + var(--safe-left));
+      calc(0.55rem + var(--safe-top))
+      calc(0.55rem + var(--safe-right))
+      0.4rem
+      calc(0.55rem + var(--safe-left));
   }
 
   .topbar-row {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 0.45rem 0.65rem;
+    gap: 0.4rem;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    gap: 0.4rem;
+    max-width: 42%;
   }
 
   .brand h1 {
-    font-size: 1.05rem;
+    font-size: 1rem;
+    letter-spacing: 0.14em;
   }
 
+  /* ≤720 即藏副标，给 历象|列宿|羲和 留宽 */
   .brand .sub {
-    font-size: 0.58rem;
+    display: none;
   }
 
   .brand-logo {
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
   }
 
   .main-nav {
-    margin-left: auto;
+    margin-left: 0;
     flex: 1 1 auto;
-    justify-content: flex-end;
+    flex-wrap: nowrap;
+    justify-content: stretch;
     min-width: 0;
+    gap: 0.28rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .nav-link {
-    flex: 1 1 0;
+    flex: none;
+    width: 100%;
     min-width: 0;
-    max-width: 5.5rem;
+    max-width: none;
+    padding: 0 0.2rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
   }
 
   .tools-row {
     width: 100%;
     min-height: auto;
     gap: 0.4rem;
+  }
+
+  .tools-scroll {
+    width: 100%;
     flex-wrap: nowrap;
+    gap: 0.4rem;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding-bottom: 0.12rem;
     overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    padding: 0.15rem 0.1rem 0.4rem;
+    margin: 0;
   }
 
-  .tools-row::-webkit-scrollbar {
+  .tools-scroll::-webkit-scrollbar {
     display: none;
   }
 
@@ -638,7 +863,8 @@ onUnmounted(() => {
   .time-play,
   .loc-wrap,
   .btn,
-  .date-wrap {
+  .date-wrap,
+  .more-wrap {
     flex: 0 0 auto;
   }
 
@@ -655,9 +881,15 @@ onUnmounted(() => {
   .day-nav-btn,
   .time-play-btn,
   .btn,
-  .nav-link,
-  .loc-btn {
+  .loc-btn,
+  .more-btn {
     min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    height: auto;
+  }
+
+  .nav-link {
+    min-width: 0;
     min-height: var(--tap-min);
     height: auto;
   }
@@ -666,12 +898,65 @@ onUnmounted(() => {
   .time-play-btn {
     flex: 0 0 auto;
     white-space: nowrap;
-    font-size: 0.66rem;
-    padding: 0 0.68rem;
+    font-size: 0.68rem;
+    padding: 0 0.72rem;
   }
 
-  .day-nav {
+  .day-nav--mobile {
     display: inline-flex;
+  }
+
+  .more-wrap {
+    display: inline-flex;
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    margin-left: 0.15rem;
+    padding-left: 0.25rem;
+    background: linear-gradient(
+      90deg,
+      rgba(8, 14, 22, 0) 0%,
+      rgba(8, 14, 22, 0.92) 28%
+    );
+  }
+
+  .more-btn {
+    padding: 0 0.85rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    box-shadow: -6px 0 10px rgba(8, 14, 22, 0.35);
+  }
+
+  .more-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.55rem 0.6rem;
+    border: 1px solid rgba(90, 138, 140, 0.28);
+    border-radius: 0.45rem;
+    background: rgba(10, 16, 24, 0.92);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .more-panel .view-toggle,
+  .more-panel .time-play {
+    height: auto;
+    min-height: var(--tap-min);
+  }
+
+  .more-panel .date-wrap {
+    flex: 1 1 8.5rem;
+    min-width: 8.5rem;
+  }
+
+  .more-panel .date-wrap input[type='date'] {
+    width: 100%;
+    min-height: var(--tap-min);
+    height: auto;
+    font-size: 0.78rem;
   }
 
   .loc-btn {
@@ -708,32 +993,32 @@ onUnmounted(() => {
     width: 5.5em;
     font-size: 0.78rem;
   }
-
-  .date-wrap {
-    min-width: 8.5rem;
-  }
-
-  .date-wrap input[type='date'] {
-    width: 100%;
-    min-height: var(--tap-min);
-    height: auto;
-    font-size: 0.78rem;
-  }
 }
 
-@media (max-width: 400px) {
-  .brand .sub {
-    display: none;
+@media (max-width: 480px) {
+  .brand {
+    max-width: 36%;
   }
 
-  .sky-mode-labels {
-    display: none;
+  .brand h1 {
+    font-size: 0.92rem;
+    letter-spacing: 0.12em;
   }
 
-  .btn {
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    padding: 0.38rem 0.55rem;
+  .nav-link {
+    padding: 0 0.12rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+  }
+
+  .sky-mode-btn {
+    font-size: 0.64rem;
+    padding: 0 0.58rem;
+  }
+
+  .more-panel {
+    gap: 0.38rem;
+    padding: 0.5rem 0.5rem;
   }
 }
 
@@ -747,12 +1032,9 @@ onUnmounted(() => {
       calc(0.65rem + var(--safe-left));
   }
 
-  .brand .sub {
-    display: none;
-  }
-
-  .tools-row {
+  .tools-scroll {
     gap: 0.32rem;
+    padding-bottom: 0.22rem;
   }
 }
 
@@ -1022,6 +1304,11 @@ onUnmounted(() => {
     min-height: var(--tap-min);
     padding: 0 0.68rem;
     font-size: 0.66rem;
+  }
+
+  .more-panel .btn {
+    min-height: var(--tap-min);
+    height: auto;
   }
 }
 </style>

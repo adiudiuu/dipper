@@ -44,7 +44,9 @@ const props = defineProps({
   viewMode: { type: String, default: 'orbit' },
   /** 地面观星视角的观测者经纬度 */
   observerLat: { type: Number, default: 39.9 },
-  observerLon: { type: Number, default: 116.4 }
+  observerLon: { type: Number, default: 116.4 },
+  /** 窄屏：降标签密度、短行星名、远距/叠日隐藏 */
+  compactLabels: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['scrub', 'culture-open'])
@@ -149,6 +151,16 @@ let groundSceneActive = false
 let mountedAlive = false
 /** 古象繁层懒加载锁，避免快速切星象时重复 build */
 let eastExtraLoadPromise = null
+/** 地球/行星 Sprite 标签，供 compact 密度与叠日剔除 */
+let bodyLabelSprites = []
+const _projA = new THREE.Vector3()
+const _projB = new THREE.Vector3()
+let labelCullClock = 0
+
+function isCompactLabels() {
+  if (props.compactLabels) return true
+  return typeof window !== 'undefined' && window.innerWidth <= 720
+}
 
 function openCulture(constellation) {
   if (!constellation?.culture) return
@@ -193,11 +205,129 @@ function applyEastLabels() {
   const mode = props.constellationMode || 'east'
   // east-core：骨架贴名；其余模式跟随题名/隐名开关（西象与古象均生效）
   const show = mode === 'east-core' || props.eastLabels !== false
+  const compact = isCompactLabels()
   eastLabelObjects.forEach((lab) => {
-    lab.visible = show
+    const quiet = lab.userData?.el?.classList?.contains('is-quiet')
+    lab.visible = show && !(compact && quiet)
   })
   westLabelObjects.forEach((lab) => {
-    lab.visible = props.eastLabels !== false
+    const quiet = lab.userData?.el?.classList?.contains('is-quiet')
+    lab.visible = props.eastLabels !== false && !(compact && quiet)
+  })
+}
+
+/** 四立：窄屏与中气同显铭文（二分二至已属中气） */
+const MAJOR_JIE_NAMES = new Set(['立春', '立夏', '立秋', '立冬'])
+let termRevealTimer = null
+let termRevealEl = null
+
+function clearTermReveal() {
+  if (termRevealTimer != null) {
+    clearTimeout(termRevealTimer)
+    termRevealTimer = null
+  }
+  if (termRevealEl) {
+    termRevealEl.classList.remove('is-revealed')
+    termRevealEl = null
+  }
+}
+
+function onTermLabelActivate(el) {
+  if (!isCompactLabels() || !el?.classList.contains('is-mute')) return
+  clearTermReveal()
+  el.classList.add('is-revealed')
+  termRevealEl = el
+  termRevealTimer = setTimeout(() => {
+    el.classList.remove('is-revealed')
+    if (termRevealEl === el) termRevealEl = null
+    termRevealTimer = null
+  }, 2200)
+}
+
+/** 窄屏降密：节气保留中气+四立+当前铭文，其余为可点圆点；行星短名且避开太阳投影 */
+function updateLabelDensity() {
+  if (!camera || !host.value) return
+  const compact = isCompactLabels()
+  const w = host.value.clientWidth || 1
+  const h = host.value.clientHeight || 1
+  const sunNearPx = Math.max(56, Math.min(w, h) * 0.14)
+
+  if (labelRenderer?.domElement) {
+    labelRenderer.domElement.classList.toggle('is-compact', compact)
+  }
+
+  termLabelObjects.forEach((obj) => {
+    // 窄屏仍保留节气节点（铭文或圆点），禁止整圈消失
+    obj.visible = true
+    const el = obj.userData.el
+    if (!el) return
+    const keepName =
+      !compact ||
+      obj.userData.zhong ||
+      MAJOR_JIE_NAMES.has(obj.userData.termName) ||
+      obj.userData.active
+    const mute = compact && !keepName
+    el.classList.toggle('is-mute', mute)
+    el.classList.toggle('is-tapable', mute)
+    if (!mute) el.classList.remove('is-revealed')
+  })
+
+  // 窄屏：默认取景即藏星官字；滚轮拉近（camDist 变小）后再显
+  const camDist = camera.position.length()
+  const skyFar = compact && camDist > 42
+  const mode = props.constellationMode || 'east'
+  const showEast = mode === 'east-core' || props.eastLabels !== false
+  eastLabelObjects.forEach((lab) => {
+    const quiet = lab.userData?.el?.classList?.contains('is-quiet')
+    lab.visible = showEast && !(compact && quiet) && !skyFar
+  })
+  westLabelObjects.forEach((lab) => {
+    const quiet = lab.userData?.el?.classList?.contains('is-quiet')
+    lab.visible = props.eastLabels !== false && !(compact && quiet) && !skyFar
+  })
+
+  if (!bodyLabelSprites.length) return
+
+  _projA.set(0, 0, 0).project(camera)
+  const sunSx = (_projA.x * 0.5 + 0.5) * w
+  const sunSy = (-_projA.y * 0.5 + 0.5) * h
+  const sunInFront = _projA.z < 1
+
+  bodyLabelSprites.forEach((spr) => {
+    if (!spr) return
+    const baseScale = spr.userData.baseScale || 1.4
+    const aspect = spr.userData.aspect || 1
+    const scaleMul = compact ? 0.72 : 1
+    spr.scale.set(aspect * baseScale * scaleMul, baseScale * scaleMul, 1)
+
+    if (!compact) {
+      spr.visible = true
+      return
+    }
+
+    // 水金内轨：窄屏默认不贴名，从根上避免贴日
+    const orbit = spr.userData.planetOrbit
+    if (typeof orbit === 'number' && orbit < 13) {
+      spr.visible = false
+      return
+    }
+
+    spr.getWorldPosition(_projB)
+    if (!sunInFront) {
+      spr.visible = true
+      return
+    }
+    _projB.project(camera)
+    if (_projB.z >= 1) {
+      spr.visible = false
+      return
+    }
+    const sx = (_projB.x * 0.5 + 0.5) * w
+    const sy = (-_projB.y * 0.5 + 0.5) * h
+    const dx = sx - sunSx
+    const dy = sy - sunSy
+    // 投影贴近太阳（含日晕）则隐藏
+    spr.visible = dx * dx + dy * dy > sunNearPx * sunNearPx
   })
 }
 
@@ -383,12 +513,19 @@ function makeTextSprite(text, opts = {}) {
 /** 黄道节气：CSS2D 无底刻铭（石青/淡金），像浑天仪环旁铭文 */
 function makeTermInscribe(jq) {
   const el = document.createElement('div')
-  el.className = `term-inscribe${jq.zhong ? ' is-zhong' : ' is-jie'}`
+  const major = MAJOR_JIE_NAMES.has(jq.name)
+  el.className = `term-inscribe${jq.zhong ? ' is-zhong' : ' is-jie'}${major ? ' is-major' : ''}`
   el.textContent = jq.name
   el.setAttribute('aria-hidden', 'true')
+  el.addEventListener('pointerdown', (e) => {
+    if (!el.classList.contains('is-tapable')) return
+    e.stopPropagation()
+    onTermLabelActivate(el)
+  })
   const obj = new CSS2DObject(el)
   obj.userData.termName = jq.name
   obj.userData.zhong = !!jq.zhong
+  obj.userData.major = major
   obj.userData.el = el
   obj.userData.active = false
   return obj
@@ -476,6 +613,8 @@ function highlightTerm(name) {
     if (obj.userData.active === active) return
     setTermActive(obj, active)
   })
+  // 当前节气切到「节」时，立刻从 mute 圆点升为铭文
+  updateLabelDensity()
 }
 
 function resize() {
@@ -492,6 +631,8 @@ function resize() {
       pts.material.uniforms.uPixelRatio.value = pr
     }
   })
+  applyEastLabels()
+  updateLabelDensity()
 }
 
 function animate(now) {
@@ -532,6 +673,11 @@ function animate(now) {
   controls?.update()
   syncGroundSky()
   updateGroundHud()
+  labelCullClock += dt
+  if (labelCullClock >= 0.12) {
+    labelCullClock = 0
+    updateLabelDensity()
+  }
   renderer.render(scene, camera)
   labelRenderer?.render(scene, camera)
   animId = requestAnimationFrame(animate)
@@ -681,6 +827,7 @@ function buildConstellationLayer(parent, layer, tier) {
 }
 
 async function buildPlanets(parent, texMap) {
+  const compact = isCompactLabels()
   for (const p of PLANETS) {
     const ringOp = p.dwarf ? 0.28 : 0.42
     parent.add(makeOrbitRing(p.orbit, p.dwarf ? 0x6a6050 : 0x5a6878, ringOp))
@@ -717,15 +864,21 @@ async function buildPlanets(parent, texMap) {
       ring.rotation.x = Math.PI / 2.35
       body.add(ring)
     }
-    const labelText = p.wuxing ? `${p.name} · ${p.wuxing}` : p.name
+    // 窄屏用短名（避免「水星·水」贴日）；桌面保留五行后缀
+    const labelText = compact || !p.wuxing ? p.name : `${p.name} · ${p.wuxing}`
     const label = makeTextSprite(labelText, {
       color: p.dwarf ? '#C8B898' : '#D8D2C4',
-      fontSize: p.dwarf ? 16 : 20,
+      fontSize: p.dwarf ? (compact ? 14 : 16) : compact ? 16 : 20,
       fontWeight: 500,
-      scale: p.dwarf ? 1.15 : 1.4
+      scale: p.dwarf ? (compact ? 0.95 : 1.15) : compact ? 1.05 : 1.4
     })
     label.position.set(0, p.size + (p.dwarf ? 0.7 : 0.85), 0)
+    label.userData.isPlanetLabel = true
+    label.userData.planetId = p.id
+    label.userData.planetOrbit = p.orbit
+    body.userData.labelSprite = label
     body.add(label)
+    bodyLabelSprites.push(label)
     parent.add(body)
   }
 }
@@ -1066,12 +1219,15 @@ onMounted(async () => {
 
   const earthLabel = makeTextSprite('地球', {
     color: '#D0DCE0',
-    fontSize: 22,
+    fontSize: isCompactLabels() ? 18 : 22,
     fontWeight: 500,
-    scale: 1.4
+    scale: isCompactLabels() ? 1.05 : 1.4
   })
   earthLabel.position.set(0, 2.0, 0)
+  earthLabel.userData.isPlanetLabel = true
+  earthLabel.userData.planetId = 'earth'
   earthOrbit.add(earthLabel)
+  bodyLabelSprites = [earthLabel]
 
   planetGroup = new THREE.Group()
   scene.add(planetGroup)
@@ -1109,6 +1265,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   mountedAlive = false
+  clearTermReveal()
   cancelAnimationFrame(animId)
   ro?.disconnect()
   window.visualViewport?.removeEventListener('resize', resize)
@@ -1129,6 +1286,7 @@ onBeforeUnmount(() => {
   controls?.dispose()
   controls = null
   termLabelObjects = []
+  bodyLabelSprites = []
   labelRenderer = null
   // 递归释放场景中所有 GPU 资源
   if (scene) {
@@ -1159,6 +1317,10 @@ watch(() => [props.sunLon, props.moonAge, props.currentTerm, props.observerLat, 
 // 地面 currentMs → animate 内 syncGroundSky；轨道行星跟 sunLon/moonAge/日期读数
 watch(() => props.constellationMode, applyConstellationMode)
 watch(() => props.eastLabels, applyEastLabels)
+watch(() => props.compactLabels, () => {
+  applyEastLabels()
+  updateLabelDensity()
+})
 watch(() => props.viewMode, (_new, _old) => { applyViewMode() })
 
 /** 视角切换：orbit ↔ ground */
@@ -1457,6 +1619,79 @@ function updateGroundHud() {
     padding-left: 0.28em;
   }
   .orbit-labels .sky-inscribe.is-quiet {
+    font-size: 8.5px;
+    letter-spacing: 0.22em;
+  }
+}
+
+/* JS compactLabels 或窄屏类：进一步降密（与 media 互补） */
+.orbit-labels.is-compact .term-inscribe {
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  padding-left: 0.26em;
+  opacity: 0.78;
+}
+.orbit-labels.is-compact .term-inscribe.is-zhong,
+.orbit-labels.is-compact .term-inscribe.is-major {
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
+  padding-left: 0.28em;
+  opacity: 0.9;
+}
+.orbit-labels.is-compact .term-inscribe.is-active {
+  font-size: 11.5px;
+  letter-spacing: 0.32em;
+  padding-left: 0.32em;
+  opacity: 1;
+}
+.orbit-labels.is-compact .term-inscribe.is-mute:not(.is-revealed) {
+  font-size: 0;
+  letter-spacing: 0;
+  padding: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(90, 138, 140, 0.55);
+  border: 1px solid rgba(184, 150, 74, 0.38);
+  box-shadow: 0 0 4px rgba(8, 14, 22, 0.45);
+  opacity: 0.72;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.orbit-labels.is-compact .term-inscribe.is-mute.is-revealed {
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
+  padding-left: 0.28em;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  opacity: 1;
+  color: #ebdaa8;
+  pointer-events: auto;
+  -webkit-text-stroke: 0.35px rgba(20, 16, 8, 0.35);
+  text-shadow:
+    0 1px 2px rgba(6, 10, 16, 0.45),
+    0 0 8px rgba(184, 150, 74, 0.28);
+}
+.orbit-labels.is-compact .sky-inscribe.is-quiet {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .orbit-labels .term-inscribe {
+    font-size: 9px;
+    letter-spacing: 0.26em;
+  }
+  .orbit-labels .term-inscribe.is-zhong {
+    font-size: 10px;
+  }
+  .orbit-labels .sky-inscribe {
     font-size: 8.5px;
     letter-spacing: 0.22em;
   }

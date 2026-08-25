@@ -165,7 +165,13 @@ input[type='date']::-webkit-date-and-time-value {
 
 @media (max-width: 720px) {
   :root {
-    --app-footer-h: 2.55rem;
+    --app-footer-h: 2.35rem;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --app-footer-h: 2.2rem;
   }
 }
 

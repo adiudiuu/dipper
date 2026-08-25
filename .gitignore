@@ -34,3 +34,10 @@ _merge_backup_*/
 
 # Tooling state
 .reasonix/
+
+# Mobile / CDP local debug
+scripts/chrome-profile/
+scripts/*.png
+scripts/*-dom.html
+scripts/cdp-mobile-check.py
+scripts/mobile-smoke.mjs

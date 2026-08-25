@@ -130,24 +130,23 @@ const versionLabel = `v${version}`
   .site-footer {
     z-index: 30;
     padding:
-      0.28rem
-      calc(0.7rem + var(--safe-right))
-      calc(0.28rem + var(--safe-bottom))
-      calc(0.7rem + var(--safe-left));
+      0.22rem
+      calc(0.65rem + var(--safe-right))
+      calc(0.22rem + var(--safe-bottom))
+      calc(0.65rem + var(--safe-left));
     gap: 0.3rem;
     flex-wrap: nowrap;
   }
 
+  /* 顶栏已有品牌，页脚只留版本+链接，减占位 */
+  .foot-name,
   .foot-sub {
     display: none;
   }
 
-  .foot-name {
-    font-size: 0.64rem;
-  }
-
   .foot-version {
     font-size: 0.46rem;
+    color: rgba(110, 154, 156, 0.32);
   }
 
   .foot-link {
@@ -155,6 +154,12 @@ const versionLabel = `v${version}`
     letter-spacing: 0.1em;
     min-height: var(--tap-min);
     padding: 0.2rem 0.15rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .foot-version {
+    font-size: 0.42rem;
   }
 }
 </style>

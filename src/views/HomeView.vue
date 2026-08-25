@@ -5,6 +5,7 @@ import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import AlmanacPanel from '../components/AlmanacPanel.vue'
 import CultureCard from '../components/CultureCard.vue'
+import JieqiStrip from '../components/JieqiStrip.vue'
 import { isEditableTarget } from '../composables/useContentGuard.js'
 import {
   DAY_MS,
@@ -277,7 +278,15 @@ function defaultLixiangOpen() {
 
 function syncLayoutBreakpoint() {
   const desktop = window.matchMedia(DESKTOP_MQ).matches
+  const wasMobile = isMobileLayout.value
   isMobileLayout.value = !desktop
+  // 切入窄屏时收起历象，避免侧栏「桌面缩小」残留
+  if (!desktop && !wasMobile) {
+    lixiangOpen.value = false
+  }
+  if (desktop && wasMobile) {
+    lixiangOpen.value = true
+  }
 }
 
 function dismissMobileHint() {
@@ -420,8 +429,13 @@ onBeforeUnmount(() => {
         :view-mode="viewMode"
         :observer-lat="observerLat"
         :observer-lon="observerLon"
+        :compact-labels="isMobileLayout"
         @scrub="onScrub"
         @culture-open="onCultureOpen"
+      />
+      <JieqiStrip
+        v-if="isMobileLayout && !lixiangOpen && viewMode === 'orbit'"
+        :current-term="jieqi.current.name"
       />
       <AlmanacPanel
         ref="almanacRef"
@@ -486,7 +500,7 @@ onBeforeUnmount(() => {
 .mobile-hint {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--app-footer-h) + 3.2rem + var(--safe-bottom));
+  bottom: calc(var(--app-footer-h) + 5.1rem + var(--safe-bottom));
   z-index: 25;
   transform: translateX(-50%);
   width: min(18rem, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
@@ -522,7 +536,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) and (orientation: landscape) {
   .mobile-hint {
-    bottom: calc(var(--app-footer-h) + 0.85rem + var(--safe-bottom));
+    bottom: calc(var(--app-footer-h) + 4.2rem + var(--safe-bottom));
   }
 }
 </style>

@@ -268,68 +268,141 @@ defineExpose({ resetFestivals })
 
 @media (max-width: 720px) {
   .lixiang {
-    --rail-w: 2.75rem;
-    --panel-w: min(16.5rem, calc(100vw - 1.3rem - var(--rail-w) - var(--safe-right)));
-    --lixiang-bottom: calc(var(--app-footer-h) + 0.35rem + var(--safe-bottom));
+    --rail-w: 100%;
+    --panel-w: 100%;
+    --sheet-h: min(58vh, calc(100dvh - var(--app-footer-h) - 5.5rem - var(--safe-top)));
+    --lixiang-bottom: calc(var(--app-footer-h) + var(--safe-bottom));
     position: fixed;
     z-index: 25;
-    right: calc(0.65rem + var(--safe-right));
-    left: auto;
+    left: 0;
+    right: 0;
     top: auto;
     bottom: var(--lixiang-bottom);
-    height: min(48vh, calc(100dvh - var(--lixiang-bottom) - 4.5rem - var(--safe-top)));
-    max-height: min(48vh, calc(100dvh - var(--lixiang-bottom) - 4.5rem - var(--safe-top)));
-    border-radius: 0.55rem 0 0 0.55rem;
+    width: 100%;
+    height: var(--sheet-h);
+    max-height: var(--sheet-h);
+    flex-direction: column;
+    border-radius: 0.85rem 0.85rem 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
     box-shadow:
-      0 -4px 24px rgba(0, 0, 0, 0.28),
-      0 8px 24px rgba(0, 0, 0, 0.12);
+      0 -8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(90, 138, 140, 0.12);
+    transition:
+      height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.32s ease,
+      border-radius 0.32s ease,
+      width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* 收起时靠左，避开右下角 GitHub */
+  .lixiang::before {
+    background: rgba(8, 14, 22, 0.88);
+    backdrop-filter: blur(14px);
+  }
+
+  /* 收起：左下角胶囊，避开 GitHub */
   .lixiang.collapsed {
-    right: auto;
     left: calc(0.55rem + var(--safe-left));
-    border-radius: 0 0.55rem 0.55rem 0;
+    right: auto;
+    width: auto;
     height: auto;
     max-height: none;
-    min-height: 5.5rem;
+    min-height: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(90, 138, 140, 0.28);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  .lixiang.collapsed::before {
+    background: rgba(8, 14, 22, 0.78);
+    border-radius: inherit;
   }
 
   .lixiang.collapsed .lixiang-rail {
-    border-right: none;
-    border-left: none;
+    flex-direction: row;
+    width: auto;
+    min-width: 0;
+    min-height: var(--tap-min);
+    padding: 0.35rem 0.95rem;
+    border: none;
+    gap: 0.35rem;
+  }
+
+  .lixiang.collapsed .rail-mark {
+    transform: rotate(-90deg);
+  }
+
+  .lixiang.collapsed .rail-title {
+    writing-mode: horizontal-tb;
+    letter-spacing: 0.22em;
+    font-size: 0.72rem;
+  }
+
+  .lixiang.collapsed .lixiang-shell {
+    display: none;
   }
 
   .lixiang-rail {
-    min-width: var(--rail-w);
+    flex: 0 0 auto;
+    flex-direction: row;
+    width: 100%;
+    min-width: 0;
     min-height: var(--tap-min);
+    padding: 0.55rem 1rem 0.4rem;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    gap: 0.45rem;
+    justify-content: center;
+  }
+
+  .rail-mark {
+    font-size: 0.85rem;
+    transform: rotate(90deg);
   }
 
   .rail-title {
-    font-size: 0.68rem;
-    letter-spacing: 0.22em;
+    writing-mode: horizontal-tb;
+    font-size: 0.78rem;
+    letter-spacing: 0.28em;
+  }
+
+  .lixiang-shell {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .lixiang-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(0.55rem + var(--safe-bottom));
   }
 }
 
 @media (max-width: 480px) {
   .lixiang:not(.collapsed) {
-    --panel-w: calc(100vw - 0.9rem - var(--rail-w) - var(--safe-left) - var(--safe-right));
-    left: calc(0.45rem + var(--safe-left));
-    right: calc(0.45rem + var(--safe-right));
-    width: auto;
-    height: min(55vh, calc(100dvh - var(--lixiang-bottom) - 4.2rem - var(--safe-top)));
-    max-height: min(55vh, calc(100dvh - var(--lixiang-bottom) - 4.2rem - var(--safe-top)));
+    --sheet-h: min(62vh, calc(100dvh - var(--app-footer-h) - 5rem - var(--safe-top)));
+    height: var(--sheet-h);
+    max-height: var(--sheet-h);
   }
 }
 
 @media (max-width: 720px) and (orientation: landscape) {
   .lixiang:not(.collapsed) {
-    height: min(78vh, calc(100dvh - var(--lixiang-bottom) - 2.8rem - var(--safe-top)));
-    max-height: min(78vh, calc(100dvh - var(--lixiang-bottom) - 2.8rem - var(--safe-top)));
-    --panel-w: min(18rem, calc(50vw - 1rem));
+    --sheet-h: min(82vh, calc(100dvh - var(--app-footer-h) - 3.2rem - var(--safe-top)));
     left: auto;
-    right: calc(0.45rem + var(--safe-right));
-    width: calc(var(--rail-w) + var(--panel-w));
+    right: 0;
+    width: min(22rem, 52vw);
+    height: var(--sheet-h);
+    max-height: var(--sheet-h);
+    border-radius: 0.75rem 0 0 0;
+    border-left: 1px solid var(--panel-border);
+  }
+
+  .lixiang.collapsed {
+    left: calc(0.45rem + var(--safe-left));
   }
 }
 </style>

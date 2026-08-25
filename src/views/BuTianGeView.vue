@@ -745,6 +745,7 @@ onBeforeUnmount(() => {
   }
 }
 
+/* 窄屏以 JS .is-mobile 为准；纯 CSS 兜底避免 JS 未就绪时仍呈双栏缩小 */
 @media (max-width: 720px) {
   .mobile-pane-tabs {
     display: flex;
@@ -779,10 +780,11 @@ onBeforeUnmount(() => {
     background: rgba(184, 150, 74, 0.1);
   }
 
+  .split-layout,
   .split-layout.is-mobile {
     display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(0, 1fr) !important;
     gap: 0;
     padding:
       0.2rem
@@ -791,6 +793,8 @@ onBeforeUnmount(() => {
       calc(0.65rem + var(--safe-left));
   }
 
+  .split-layout .sky-panel,
+  .split-layout .lyrics-panel,
   .split-layout.is-mobile .sky-panel,
   .split-layout.is-mobile .lyrics-panel {
     grid-area: 1 / 1;
@@ -798,7 +802,8 @@ onBeforeUnmount(() => {
     height: 100%;
   }
 
-  /* 叠层切换：保星空画布尺寸，勿 display:none */
+  /* 无 is-mobile 类时默认只显星空；有 pane-* 则跟切换 */
+  .split-layout:not(.is-mobile) .lyrics-panel,
   .split-layout.is-mobile.pane-sky .lyrics-panel,
   .split-layout.is-mobile.pane-lyrics .sky-panel {
     visibility: hidden;
@@ -806,6 +811,7 @@ onBeforeUnmount(() => {
     z-index: 0;
   }
 
+  .split-layout:not(.is-mobile) .sky-panel,
   .split-layout.is-mobile.pane-sky .sky-panel,
   .split-layout.is-mobile.pane-lyrics .lyrics-panel {
     visibility: visible;
@@ -838,6 +844,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) and (orientation: landscape) {
+  .split-layout,
   .split-layout.is-mobile {
     padding-bottom: calc(0.3rem + var(--app-footer-h));
   }

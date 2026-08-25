@@ -508,4 +508,26 @@ watch(() => props.constellationMode, async () => {
   color: rgba(235, 218, 168, 0.98);
   outline: none;
 }
+
+@media (max-width: 720px) {
+  .butian-labels .sky-inscribe {
+    font-size: 9.5px;
+    letter-spacing: 0.26em;
+    padding-left: 0.26em;
+  }
+  .butian-labels .sky-inscribe.is-active {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+  }
+  .butian-labels .sky-inscribe.is-dim {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .butian-labels .sky-inscribe {
+    font-size: 8.5px;
+    letter-spacing: 0.2em;
+  }
+}
 </style>
