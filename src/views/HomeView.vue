@@ -47,6 +47,8 @@ const showMobileHint = ref(false)
 const constellationMode = ref('east')
 const eastLabels = ref(true)
 const viewMode = ref('orbit')
+/** 岁差观测历元（公历年份，默认 J2000） */
+const epochYear = ref(2000)
 
 /** 观测位置预设 */
 const LOCATIONS = [
@@ -266,6 +268,7 @@ function goDefaults() {
   constellationMode.value = 'east'
   eastLabels.value = true
   viewMode.value = 'orbit'
+  epochYear.value = 2000
   observerLat.value = LOCATIONS[0].lat
   observerLon.value = LOCATIONS[0].lon
   observerPlace.value = LOCATIONS[0].name
@@ -482,6 +485,7 @@ onBeforeUnmount(() => {
       v-model:constellation-mode="constellationMode"
       v-model:east-labels="eastLabels"
       v-model:view-mode="viewMode"
+      v-model:epoch-year="epochYear"
       v-model:date-value="dateInputValue"
       :sky-modes="SKY_MODES"
       :locations="LOCATIONS"
@@ -527,6 +531,7 @@ onBeforeUnmount(() => {
         :observer-lon="observerLon"
         :compact-labels="isMobileLayout"
         :highlight-names="starHighlightNames"
+        :epoch-year="epochYear"
         @scrub="onScrub"
         @culture-open="onCultureOpen"
       />

@@ -28,6 +28,12 @@ import {
   updateAsteroidBelt,
   updateComet
 } from '../lib/sky.js'
+import {
+  POLE_STARS,
+  PRECESSION_AXIS,
+  accumulatedPrecessionDeg,
+  nearestPoleStar
+} from '../lib/precession.js'
 
 import { useScrubControl } from '../composables/useScrubControl.js'
 
@@ -48,7 +54,9 @@ const props = defineProps({
   /** 窄屏：降标签密度、短行星名、远距/叠日隐藏 */
   compactLabels: { type: Boolean, default: false },
   /** 高亮星官/星座名（来自列宿页跳转） */
-  highlightNames: { type: Array, default: () => [] }
+  highlightNames: { type: Array, default: () => [] },
+  /** 岁差观测历元（公历年份 −2000..2100；2000 = J2000 现行） */
+  epochYear: { type: Number, default: 2000 }
 })
 
 const emit = defineEmits(['scrub', 'culture-open'])
@@ -110,6 +118,11 @@ const HUD_CARDINALS = [0, 45, 90, 135, 180, 225, 270, 315].map((az) => ({
 const AX_X = new THREE.Vector3(1, 0, 0)
 const AX_Y = new THREE.Vector3(0, 1, 0)
 
+/** 岁差参考方向（天球局部系）：J2000 北天极、进动轴（北黄极）、冬至点天区方向 */
+const POLE_DIR = new THREE.Vector3(0, 1, 0)
+const NEP_V3 = new THREE.Vector3(...PRECESSION_AXIS)
+const SOLSTICE_DIR = raDecToVec(18, -23.43929111, 1)
+
 /** 黄经 λ（弧度）→ 黄道 XZ；Y 为北黄极，λ 增大为自西向东（俯视逆时针） */
 function eclipticPos(radius, lonRad) {
   return {
@@ -145,10 +158,14 @@ let skyWestGroup = null
 let skyEastGroup = null
 let skyEastExtraGroup = null
 let skyDome = null
+/** 岁差容器：整片恒星场（星点/银河带/星座/星云）绕北黄极轴进动 */
+let skyRoot = null
 let eastLabelObjects = []
 let westLabelObjects = []
 let culturePickMeshes = []
 let groundHorizon = null
+/** 「北天极 · 近XX」动态铭文标签 */
+let poleCaptionLabel = null
 let groundSceneActive = false
 let mountedAlive = false
 /** 古象繁层懒加载锁，避免快速切星象时重复 build */
@@ -1044,11 +1061,15 @@ onMounted(async () => {
   skyDome = new THREE.Group()
   scene.add(skyDome)
 
+  // 岁差容器：整片恒星场（星点/银河带/星座/星云）绕北黄极轴缓慢进动
+  skyRoot = new THREE.Group()
+  skyDome.add(skyRoot)
+
   // 天球壳大于最远星点与相机拉远上限，BackSide 从内侧看
-  skyDome.add(makeNebulaShell(230))
+  skyRoot.add(makeNebulaShell(230))
   nebulaSprites = makeNebulaSprites()
   nebulaSprites.renderOrder = -18
-  skyDome.add(nebulaSprites)
+  skyRoot.add(nebulaSprites)
 
   // 星点壳在相机最大半径之外，任意环视都仍在球内看满天星
   twinkleStars = [
@@ -1058,7 +1079,7 @@ onMounted(async () => {
     makeStarField(260, 148, 225, 0xf2f4f5, 3.5, 0.9, { crossed: true }),
     makeGalaxyBand(900, 175)
   ]
-  twinkleStars.forEach((s) => skyDome.add(s))
+  twinkleStars.forEach((s) => skyRoot.add(s))
 
   // 地面水平环（地景视角，默认隐藏）
   groundHorizon = makeGroundHorizon()
@@ -1086,8 +1107,6 @@ onMounted(async () => {
     updateComet(c, 0)
   })
 
-  const skyRoot = new THREE.Group()
-  skyDome.add(skyRoot)
   skyWestGroup = new THREE.Group()
   skyEastGroup = new THREE.Group()
   skyEastExtraGroup = new THREE.Group()
@@ -1102,6 +1121,10 @@ onMounted(async () => {
   buildConstellationLayer(skyEastGroup, 'east', 'core')
   // 古象繁（约 283 星官）通过 applyConstellationMode 动态加载
   applyConstellationMode()
+
+  // —— 岁差：惯性标记 + 极星参照标签 + 初始历元 ——
+  buildPrecessionMarkers()
+  applyPrecession()
 
   const sunFallback = makeFallbackTex((ctx, s) => {
     const g = ctx.createRadialGradient(s * 0.5, s * 0.5, 2, s * 0.5, s * 0.5, s * 0.5)
@@ -1430,6 +1453,7 @@ watch(() => props.compactLabels, () => {
   updateLabelDensity()
 })
 watch(() => props.viewMode, (_new, _old) => { applyViewMode() })
+watch(() => props.epochYear, applyPrecession)
 
 /** 视角切换：orbit ↔ ground */
 function applyViewMode() {
@@ -1480,6 +1504,127 @@ function applyViewMode() {
     if (comets) comets.forEach((c) => { c.visible = true })
     // 恢复天球旋转
     syncOrbits()
+  }
+}
+
+/* —— 岁差标记与极星参照 —— */
+const POLE_REF_TEXT = {
+  勾陈一: '勾陈一 · 今极星',
+  右枢: '右枢 · 前28世纪极星',
+  织女一: '织女一 · 13—15千纪近极'
+}
+
+function makeMiniDot(color, r = 0.55) {
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(r, 16, 16),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      fog: false
+    })
+  )
+}
+
+function makeMiniHalo(color, r = 1.5, opacity = 0.16) {
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(r, 16, 16),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      fog: false,
+      blending: THREE.AdditiveBlending
+    })
+  )
+}
+
+/** 岁差专用铭文标签（标出极星更替的参照星） */
+function makePoleInscribe(text, cls) {
+  const label = makeSkyInscribe(text)
+  if (cls) label.userData.el.classList.add(cls)
+  return label
+}
+
+/**
+ * 岁差惯性标记：
+ * - 极路径环（约 2.6 万年一周的北天极轨迹）与三颗极星参照 → 挂星场组，随进动旋转；
+ * - 北天极 / 北黄极 / 冬至·星空 标记 → 钉在惯性天球，星场在其下滑动。
+ */
+function buildPrecessionMarkers() {
+  // 极路径环：北天极绕北黄极一圈的轨迹（星场坐标，随星场进动）
+  const circlePts = []
+  for (let i = 0; i <= 180; i++) {
+    const a = (i / 180) * Math.PI * 2
+    circlePts.push(POLE_DIR.clone().applyAxisAngle(NEP_V3, a).multiplyScalar(SKY_R))
+  }
+  const poleCircle = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(circlePts),
+    new THREE.LineBasicMaterial({
+      color: 0x3a6a72,
+      transparent: true,
+      opacity: 0.3,
+      fog: false,
+      depthWrite: false
+    })
+  )
+  poleCircle.renderOrder = -4
+  skyRoot.add(poleCircle)
+
+  // 三颗极星永久参照（静态星场坐标）
+  POLE_STARS.forEach((s) => {
+    const label = makePoleInscribe(POLE_REF_TEXT[s.name] || s.name, 'is-ref')
+    const dir = raDecToVec(s.ra, s.dec, 1)
+    label.position.copy(dir).multiplyScalar(SKY_R * 1.02)
+    skyRoot.add(label)
+  })
+
+  // 北天极：亮珠 + 光晕 + 动态「近XX」铭文（钉在惯性天球，恒为周日旋转中心）
+  const poleDot = makeMiniDot(0xa8ecf4)
+  poleDot.position.set(0, SKY_R, 0)
+  skyDome.add(poleDot)
+  const poleHalo = makeMiniHalo(0x6ad4dc, 1.6, 0.18)
+  poleHalo.position.set(0, SKY_R, 0)
+  skyDome.add(poleHalo)
+  poleCaptionLabel = makePoleInscribe('北天极 · 近勾陈一', 'is-pole')
+  poleCaptionLabel.position.set(0, SKY_R + 2.8, 0)
+  skyDome.add(poleCaptionLabel)
+
+  // 北黄极（天球局部 (0, cosε, −sinε)）：近似固定参照
+  const nepDir = NEP_V3.clone()
+  const nepDot = makeMiniDot(0xd8b05a, 0.4)
+  nepDot.position.copy(nepDir).multiplyScalar(SKY_R)
+  skyDome.add(nepDot)
+  const nepLabel = makePoleInscribe('北黄极', 'is-tag')
+  nepLabel.position.copy(nepDir).multiplyScalar(SKY_R * 1.04)
+  nepLabel.position.y += 1.2
+  skyDome.add(nepLabel)
+
+  // 冬至·星空：历法冬至点在恒星背景里的固定方向，星场于其下西移
+  const solDir = SOLSTICE_DIR.clone()
+  const solDot = makeMiniDot(0xe8a05a, 0.45)
+  solDot.position.copy(solDir).multiplyScalar(SKY_R)
+  skyDome.add(solDot)
+  const solLabel = makePoleInscribe('冬至 · 星空', 'is-tag')
+  solLabel.position.copy(solDir).multiplyScalar(SKY_R * 1.05)
+  skyDome.add(solLabel)
+}
+
+/**
+ * 岁差：星场整体绕 J2000 北黄极轴进动到观测历元。
+ * θ<0（过去）时星场顺时针回旋，使对应年的极星恰好移到钉在天球上的「北天极」标记处。
+ */
+function applyPrecession() {
+  if (!skyRoot) return
+  const thetaRad = accumulatedPrecessionDeg(props.epochYear) * DEG
+  skyRoot.quaternion.setFromAxisAngle(NEP_V3, -thetaRad)
+  if (poleCaptionLabel?.userData?.el) {
+    const near = nearestPoleStar(props.epochYear)
+    poleCaptionLabel.userData.el.textContent = near
+      ? `北天极 · 近${near.name}（${near.distDeg.toFixed(1)}°）`
+      : `北天极 · 极星漂移中`
   }
 }
 
@@ -1711,6 +1856,31 @@ function updateGroundHud() {
 .orbit-labels .sky-inscribe.is-dim {
   opacity: 0.42;
 }
+.orbit-labels .sky-inscribe.is-pole {
+  color: rgba(168, 233, 240, 0.96);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  -webkit-text-stroke: 0.45px rgba(8, 14, 22, 0.7);
+  text-shadow:
+    0 1px 2px rgba(6, 10, 16, 0.6),
+    0 0 8px rgba(90, 210, 220, 0.28);
+}
+.orbit-labels .sky-inscribe.is-ref {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  padding-left: 0.24em;
+  color: rgba(190, 210, 216, 0.7);
+  -webkit-text-stroke: 0.35px rgba(8, 14, 22, 0.55);
+}
+.orbit-labels .sky-inscribe.is-tag {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  padding-left: 0.24em;
+  color: rgba(160, 208, 196, 0.8);
+  -webkit-text-stroke: 0.35px rgba(8, 14, 22, 0.55);
+}
 
 @media (max-width: 720px) {
   .orbit-labels .term-inscribe {
@@ -1798,6 +1968,11 @@ function updateGroundHud() {
     0 0 8px rgba(184, 150, 74, 0.28);
 }
 .orbit-labels.is-compact .sky-inscribe.is-quiet {
+  display: none;
+}
+/* 窄屏降密：参照星/辅助标签隐藏，仅保留「北天极」动态铭文 */
+.orbit-labels.is-compact .sky-inscribe.is-ref,
+.orbit-labels.is-compact .sky-inscribe.is-tag {
   display: none;
 }
 

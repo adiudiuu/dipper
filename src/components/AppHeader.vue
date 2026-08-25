@@ -13,7 +13,9 @@ const props = defineProps({
   observerLon: { type: Number, default: 116.4 },
   observerPlace: { type: String, default: '北京' },
   timePlaying: { type: Boolean, default: false },
-  timeSpeedLabel: { type: String, default: '1小时/秒' }
+  timeSpeedLabel: { type: String, default: '1小时/秒' },
+  /** 岁差观测历元（公历年份，仅历象页） */
+  epochYear: { type: Number, default: 2000 }
 })
 
 const emit = defineEmits([
@@ -24,6 +26,7 @@ const emit = defineEmits([
   'update:observerLat',
   'update:observerLon',
   'update:observerPlace',
+  'update:epochYear',
   'togglePlay',
   'cycleSpeed',
   'defaults',
@@ -35,6 +38,14 @@ const route = useRoute()
 const isHome = computed(() => route.path === '/')
 const isBuTianGe = computed(() => route.path.startsWith('/butiange'))
 const showToolsRow = computed(() => isHome.value || isBuTianGe.value)
+
+/** 岁差年份格式化：公元 / 公元前 */
+const epochText = computed(() => {
+  const y = Math.round(props.epochYear)
+  if (y < 0) return `公元前${-y}年`
+  if (y === 0) return '公元1年'
+  return `公元${y}年`
+})
 
 const navItems = [
   { to: '/', label: '历象', title: '历象日月星辰' },
@@ -301,6 +312,20 @@ onUnmounted(() => {
                 @input="emit('update:dateValue', $event.target.value)"
               >
             </label>
+            <label
+              class="epoch-wrap"
+              title="岁差：北天极与冬至点相对恒星的缓慢漂移（约 2.6 万年一周）。拖动观察极星更替与冬至点西移。"
+            >
+              <span class="epoch-label">岁差</span>
+              <input
+                type="range"
+                min="-2000" max="2100" step="1"
+                :value="epochYear"
+                aria-label="岁差年份"
+                @input="emit('update:epochYear', Number($event.target.value))"
+              >
+              <span class="epoch-value">{{ epochText }}</span>
+            </label>
           </div>
 
           <div class="day-nav day-nav--mobile" role="group" aria-label="换日">
@@ -474,6 +499,20 @@ onUnmounted(() => {
             aria-label="选择公历日期"
             @input="emit('update:dateValue', $event.target.value)"
           >
+        </label>
+        <label
+          class="epoch-wrap"
+          title="岁差：北天极与冬至点相对恒星的缓慢漂移（约 2.6 万年一周）。拖动观察极星更替与冬至点西移。"
+        >
+          <span class="epoch-label">岁差</span>
+          <input
+            type="range"
+            min="-2000" max="2100" step="1"
+            :value="epochYear"
+            aria-label="岁差年份"
+            @input="emit('update:epochYear', Number($event.target.value))"
+          >
+          <span class="epoch-value">{{ epochText }}</span>
         </label>
       </div>
     </div>
@@ -770,6 +809,40 @@ onUnmounted(() => {
   color: var(--xuan-zhi);
 }
 
+/* —— 岁差滑杆 —— */
+.epoch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.epoch-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--xuan-zhi-mute);
+}
+
+.epoch-wrap input[type='range'] {
+  width: 7.5rem;
+  min-height: 2.05rem;
+  accent-color: var(--dan-jin);
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.epoch-wrap input[type='range']:focus {
+  outline: none;
+}
+
+.epoch-value {
+  min-width: 4.6em;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  color: var(--shi-qing);
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .site-header {
     gap: 0.35rem;
@@ -864,6 +937,7 @@ onUnmounted(() => {
   .loc-wrap,
   .btn,
   .date-wrap,
+  .epoch-wrap,
   .more-wrap {
     flex: 0 0 auto;
   }
@@ -957,6 +1031,26 @@ onUnmounted(() => {
     min-height: var(--tap-min);
     height: auto;
     font-size: 0.78rem;
+  }
+
+  .epoch-wrap {
+    min-height: var(--tap-min);
+  }
+
+  .epoch-wrap input[type='range'] {
+    width: 6.5rem;
+    min-height: var(--tap-min);
+  }
+
+  .more-panel .epoch-wrap {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  .more-panel .epoch-wrap input[type='range'] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 6.5rem;
   }
 
   .loc-btn {
