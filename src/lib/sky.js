@@ -1847,8 +1847,7 @@ export function createComet(opts = {}) {
     omega = 1.15,
     period = 140,
     phase = 0.85,
-    color = 0xb8d8e8,
-    name = '彗星'
+    color = 0xb8d8e8
   } = opts
 
   const group = new THREE.Group()

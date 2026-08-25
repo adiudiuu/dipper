@@ -1,6 +1,12 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import OrbitScene from '../components/OrbitScene.vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import SceneLoadingPlaceholder from '../components/SceneLoadingPlaceholder.vue'
+
+const OrbitScene = defineAsyncComponent({
+  loader: () => import('../components/OrbitScene.vue'),
+  loadingComponent: SceneLoadingPlaceholder,
+  delay: 120
+})
 import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import AlmanacPanel from '../components/AlmanacPanel.vue'

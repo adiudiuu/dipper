@@ -3,4 +3,5 @@ node_modules
 public
 package-lock.json
 src/lib/eastAsterisms.js
+src/lib/eastAsterisms.data.js
 src/lib/sky.js

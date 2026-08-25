@@ -2,7 +2,6 @@
  * 拨日交互控制 composable
  * 桌面：Shift+左键拖动；触屏：长按后横拖
  */
-import { markRaw } from 'vue'
 import * as THREE from 'three'
 
 const PX_PER_DAY = 5
