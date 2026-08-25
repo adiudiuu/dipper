@@ -11,19 +11,19 @@ const routes = [
     path: '/',
     name: 'home',
     component: () => import('../views/HomeView.vue'),
-    meta: { title: '七政 · 历象 · 授时 · 节气' }
+    meta: { title: '七政 · 历象' }
   },
   {
     path: '/butiange',
     name: 'butiange',
     component: () => import('../views/BuTianGeView.vue'),
-    meta: { title: '七政 · 步天歌' }
+    meta: { title: '七政 · 列宿' }
   },
   {
     path: '/timeline',
     name: 'timeline',
     component: () => import('../views/TimelineView.vue'),
-    meta: { title: '七政 · 天文史时间线' }
+    meta: { title: '七政 · 羲和' }
   }
 ]
 

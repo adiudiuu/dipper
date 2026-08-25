@@ -77,14 +77,26 @@ function beijingNoonJD(y, m, d) {
   return Date.UTC(y, m - 1, d, 4, 0, 0) / DAY_MS + 2440587.5;
 }
 
+/** 毫秒时间戳 → 儒略日（与 jdToDate 互逆） */
+function msToJD(ms) {
+  return ms / DAY_MS + 2440587.5;
+}
+
 function beijingYMD(date) {
   const t = new Date(date.getTime() + BJ_MS);
   return {
     y: t.getUTCFullYear(),
     m: t.getUTCMonth() + 1,
     d: t.getUTCDate(),
-    w: t.getUTCDay()
+    w: t.getUTCDay(),
+    h: t.getUTCHours(),
+    min: t.getUTCMinutes()
   };
+}
+
+/** 北京时辰序：子=0 … 亥=11（23:00–01:00 为子时） */
+function shichenIndexFromHour(h) {
+  return Math.floor((((h % 24) + 24 + 1) % 24) / 2);
 }
 
 function beijingDayStartMs(y, m, d) {
@@ -412,7 +424,20 @@ function findLunarForCivil(y, m, d) {
   throw new Error("农历定位失败 " + y + "-" + m + "-" + d);
 }
 
-function resolveGanzhi(y, m, d) {
+function pillarText(ganIdx, zhiIdx) {
+  const gan = GAN[((ganIdx % 10) + 10) % 10];
+  const zhi = ZHI[((zhiIdx % 12) + 12) % 12];
+  return { gan, zhi, text: gan + zhi };
+}
+
+/**
+ * 年柱：农历正月朔换年（与生肖一致）。
+ * 月柱：节气建月（立春起寅），五虎遁取月干；年干取同日年柱。
+ *       太阳黄经取传入北京时刻（与时柱一致），非固定正午。
+ * 日柱：北京日界 + 儒略日正午序 (JDN+49) mod 60。
+ * 时柱：五鼠遁；无时刻时默认北京正午 → 午时（须在 UI 标明）。
+ */
+function resolveGanzhi(y, m, d, hourBj = 12, minuteBj = 0) {
   const dayIdx = beijingDayIndex(y, m, d);
   let best = null;
   for (const dzY of [y - 2, y - 1, y, y + 1]) {
@@ -425,10 +450,59 @@ function resolveGanzhi(y, m, d) {
   }
   const Y = ymdFromJD(best.shuoJD).y;
   // 注意：不能写 (Y-4+10000)%12 —— 10000≡4 (mod 12)，会把地支错移 4 位
-  const gan = GAN[((Y - 4) % 10 + 10) % 10];
-  const zhi = ZHI[((Y - 4) % 12 + 12) % 12];
-  const sx = SHENGXIAO[((Y - 4) % 12 + 12) % 12];
-  return { gan, zhi, sx, year: Y };
+  const yearGanIdx = ((Y - 4) % 10 + 10) % 10;
+  const yearZhiIdx = ((Y - 4) % 12 + 12) % 12;
+  const gan = GAN[yearGanIdx];
+  const zhi = ZHI[yearZhiIdx];
+  const sx = SHENGXIAO[yearZhiIdx];
+  const yearPillar = { gan, zhi, text: gan + zhi };
+
+  const h = hourBj == null || Number.isNaN(Number(hourBj)) ? 12 : Number(hourBj);
+  const min =
+    minuteBj == null || Number.isNaN(Number(minuteBj)) ? 0 : Number(minuteBj);
+  const jdNoon = beijingNoonJD(y, m, d);
+  // 月柱：用实际时刻太阳黄经建月（与时柱同一读数时刻）
+  const jdAtHour = jdNoon + (h - 12) / 24 + min / 1440;
+  const lon = sunApparentLongitude(jdAtHour);
+  // 立春起算，每 30° 一建月：寅卯辰…丑
+  const fromLichun = lonDiff(lon, 315);
+  const monthZhiIdx = (2 + Math.floor(fromLichun / 30)) % 12;
+  // 五虎遁：甲己丙寅、乙庚戊寅、丙辛庚寅、丁壬壬寅、戊癸甲寅
+  const yinGanIdx = [2, 4, 6, 8, 0][yearGanIdx % 5];
+  const monthOffset = (monthZhiIdx - 2 + 12) % 12;
+  const monthPillar = pillarText(yinGanIdx + monthOffset, monthZhiIdx);
+
+  const jdn = Math.floor(jdNoon + 0.5);
+  const dayIdx60 = ((jdn + 49) % 60 + 60) % 60;
+  const dayPillar = pillarText(dayIdx60, dayIdx60);
+
+  const hourZhiIdx = shichenIndexFromHour(h);
+  // 五鼠遁：甲己甲子、乙庚丙子、丙辛戊子、丁壬庚子、戊癸壬子
+  const ziGanIdx = [0, 2, 4, 6, 8][dayIdx60 % 5];
+  const hourPillar = pillarText(ziGanIdx + hourZhiIdx, hourZhiIdx);
+  const shichen = ZHI[hourZhiIdx];
+  const hourNote =
+    shichen === "午"
+      ? "时柱按午时（北京正午）"
+      : "时柱按" + shichen + "时";
+
+  return {
+    gan,
+    zhi,
+    sx,
+    year: Y,
+    pillars: {
+      year: yearPillar,
+      month: monthPillar,
+      day: dayPillar,
+      hour: {
+        ...hourPillar,
+        shichen,
+        shichenName: shichen + "时",
+        note: hourNote
+      }
+    }
+  };
 }
 
 /** 道历年数：随公历年换算（与农历新年无关） */
@@ -444,9 +518,9 @@ function lunarMonthName(month) {
   return leap + MONTH_CN[month.month - 1] + "月";
 }
 
-function formatLunar(y, m, d) {
+function formatLunar(y, m, d, hourBj = 12, minuteBj = 0) {
   const { month, day } = findLunarForCivil(y, m, d);
-  const gz = resolveGanzhi(y, m, d);
+  const gz = resolveGanzhi(y, m, d, hourBj, minuteBj);
   const monthName = lunarMonthName(month);
   /** 月日短文：如「正月初一」「腊月廿九」「闰六月十五」 */
   const mdText = monthName + (DAY_CN[day] || String(day));
@@ -564,7 +638,8 @@ function phaseName(fraction, age) {
 export {
   DEG, DAY_MS, BJ_MS, SYNODIC, JIEQI, SHENGXIAO, ZHI, GAN,
   DAO_YEAR_OFFSET,
-  beijingNoonJD, beijingDayStartMs, beijingDayIndex, civilOfMs, ymdFromDayIndex,
+  beijingNoonJD, msToJD, beijingDayStartMs, beijingDayIndex, beijingYMD, civilOfMs, ymdFromDayIndex,
+  shichenIndexFromHour,
   findLunarForCivil, resolveGanzhi, daoYearFromXiYuan,
   formatLunar, formatSolar, getJieqiContext,
   moonPhaseFraction, moonAgeDays, phaseName

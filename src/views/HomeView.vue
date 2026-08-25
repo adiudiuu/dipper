@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import OrbitScene from '../components/OrbitScene.vue'
 import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
@@ -9,7 +9,6 @@ import { isEditableTarget } from '../composables/useContentGuard.js'
 import {
   DAY_MS,
   beijingDayStartMs,
-  beijingNoonJD,
   civilOfMs,
   daoYearFromXiYuan,
   formatLunar,
@@ -17,6 +16,7 @@ import {
   getJieqiContext,
   moonAgeDays,
   moonPhaseFraction,
+  msToJD,
   phaseName
 } from '../lib/calendar.js'
 import { getFestivalsOn } from '../lib/festivals.js'
@@ -82,6 +82,10 @@ function cycleTimeSpeed() {
   timeSpeedIdx.value = (timeSpeedIdx.value + 1) % TIME_SPEEDS.length
 }
 
+watch(viewMode, (mode) => {
+  if (mode !== 'ground') pauseTimePlay()
+})
+
 function playTick(t) {
   if (!timePlaying.value) return
   const dt = Math.min(0.1, Math.max(0.001, (t - playLastT) / 1000))
@@ -100,8 +104,7 @@ function playTick(t) {
 
 const SKY_MODES = [
   { id: 'west', label: '西象' },
-  { id: 'east-core', label: '古象纲' },
-  { id: 'east', label: '古象繁' },
+  { id: 'east', label: '古象' },
   { id: 'all', label: '全部' }
 ]
 
@@ -131,18 +134,21 @@ function setDate(ms, snap = true) {
 }
 
 const ymd = computed(() => civilOfMs(currentMs.value))
-const jd = computed(() => beijingNoonJD(ymd.value.y, ymd.value.m, ymd.value.d))
+/** 历象读数用 currentMs 对应精确 JD（与时柱/地面播放一致，非固定正午） */
+const jd = computed(() => msToJD(currentMs.value))
 const solarText = computed(() => formatSolar(ymd.value.y, ymd.value.m, ymd.value.d))
 
 const lunar = computed(() => {
   try {
-    return formatLunar(ymd.value.y, ymd.value.m, ymd.value.d)
+    const hourBj = ymd.value.h ?? 12
+    const minuteBj = ymd.value.min ?? 0
+    return formatLunar(ymd.value.y, ymd.value.m, ymd.value.d, hourBj, minuteBj)
   } catch {
     return {
       text: '历法计算异常',
       mdText: '',
       isLeapMonth: false,
-      ganzhi: { sx: '—', gan: '', zhi: '' }
+      ganzhi: { sx: '—', gan: '', zhi: '', pillars: null }
     }
   }
 })
@@ -154,6 +160,8 @@ const lunarMainText = computed(() => {
   const sx = gz.sx || '—'
   return md ? `${gz.gan}${gz.zhi} ${sx}年 ${md}` : `${gz.gan}${gz.zhi} ${sx}年`
 })
+
+const sizhu = computed(() => lunar.value.ganzhi?.pillars || null)
 
 const daoYearText = computed(() => `道历 ${daoYearFromXiYuan(ymd.value.y)}`)
 const jieqi = computed(() => getJieqiContext(jd.value))
@@ -385,6 +393,7 @@ onBeforeUnmount(() => {
         :is-leap-month="lunar.isLeapMonth"
         :dao-year-text="daoYearText"
         :sui-xing="suiXing"
+        :sizhu="sizhu"
         :current-term="jieqi.current.name"
         :term-into-days="termIntoDays"
         :term-sub="termSub"
@@ -406,21 +415,6 @@ onBeforeUnmount(() => {
         @close="closeCulture"
       />
     </main>
-    <a
-      class="github-link"
-      href="https://github.com/adiudiuu/dipper"
-      target="_blank"
-      rel="noopener noreferrer"
-      title="GitHub"
-    >
-      <svg class="github-icon" viewBox="0 0 16 16" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
-        />
-      </svg>
-      <span>GitHub</span>
-    </a>
   </div>
 </template>
 
@@ -437,37 +431,6 @@ onBeforeUnmount(() => {
   position: relative;
   height: 100%;
   min-height: 0;
-}
-
-.github-link {
-  position: fixed;
-  left: calc(0.7rem + var(--safe-left));
-  bottom: calc(0.55rem + var(--safe-bottom));
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  padding: 0.35rem 0.45rem;
-  min-height: var(--tap-min);
-  font-family: var(--font-sans);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
-  color: rgba(110, 154, 156, 0.42);
-  text-decoration: none;
-  text-shadow: none;
-  pointer-events: auto;
-  transition: color 0.18s;
-}
-
-.github-link:hover {
-  color: rgba(110, 154, 156, 0.82);
-}
-
-.github-icon {
-  width: 0.78rem;
-  height: 0.78rem;
-  flex: 0 0 auto;
-  opacity: 0.9;
 }
 
 .panel-overlay {
@@ -520,13 +483,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .github-link {
-    left: calc(0.45rem + var(--safe-left));
-    bottom: calc(0.4rem + var(--safe-bottom));
-    font-size: 0.52rem;
-    letter-spacing: 0.1em;
-  }
-
   .mobile-hint {
     bottom: calc(4.8rem + var(--safe-bottom));
   }

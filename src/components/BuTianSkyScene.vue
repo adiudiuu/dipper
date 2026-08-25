@@ -4,8 +4,10 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
+import { getBuTianGeAsterismNames } from '../lib/buTianGe.js'
 import {
   CONSTELLATIONS,
+  ensureExtraAsterisms,
   makeGalaxyBand,
   makeNebulaShell,
   makeNebulaSprites,
@@ -14,11 +16,16 @@ import {
 } from '../lib/sky.js'
 
 const props = defineProps({
-  /** 当前高亮的星官名列表 */
+  /** 当前高亮的星官/星座名列表 */
   highlightNames: { type: Array, default: () => [] },
-  /** 是否显示全部古象纲标签 */
-  showLabels: { type: Boolean, default: true }
+  /** 是否显示星名（西象/古象当前层均生效） */
+  showLabels: { type: Boolean, default: true },
+  /** 星象层：west 西象 | east 古象（全量）| all 两层同显 */
+  constellationMode: { type: String, default: 'east' }
 })
+
+/** 歌诀引用到的东象名：用于优先贴名（全量仍挂载） */
+const LYRIC_ASTERISM_NAMES = getBuTianGeAsterismNames()
 
 const emit = defineEmits(['constellation-click'])
 
@@ -32,7 +39,7 @@ const CAM_INIT_THETA = 0.72
 const CAM_INIT_PHI = 1.05
 const CAM_INIT_FOV = 48
 
-/** @type {Map<string, { stars: THREE.Mesh[], halos: THREE.Mesh[], lines: THREE.Line[], label: import('three/examples/jsm/renderers/CSS2DRenderer.js').CSS2DObject | null, center: THREE.Vector3 }>} */
+/** @type {Map<string, { stars: THREE.Mesh[], halos: THREE.Mesh[], lines: THREE.Line[], label: import('three/examples/jsm/renderers/CSS2DRenderer.js').CSS2DObject | null, center: THREE.Vector3, layer: string, isPrimary: boolean }>} */
 const constellationMap = new Map()
 
 let renderer
@@ -46,6 +53,8 @@ let ro
 let mountedAlive = false
 let focusTarget = new THREE.Vector3(0, 0, 0)
 let desiredFocus = new THREE.Vector3(0, 0, 0)
+let eastGroup = null
+let westGroup = null
 
 function makeSkyInscribe(name) {
   const el = document.createElement('div')
@@ -70,14 +79,28 @@ function applyMaterialOpacity(mesh, opacity) {
   mesh.material.transparent = true
 }
 
-function buildEastCore(parent) {
-  CONSTELLATIONS.filter((c) => c.layer === 'east' && c.tier === 'core').forEach((c) => {
-    const starOp = 0.92
-    const haloOp = 0.2
-    const lineOp = 0.76
+function shouldInclude(c, layer) {
+  return c.layer === layer
+}
+
+function isPrimaryAsterism(c, layer) {
+  if (layer === 'east') {
+    // core 与歌诀引用的附座优先贴名；其余 extra 默认较淡
+    if (c.tier === 'core') return true
+    return LYRIC_ASTERISM_NAMES.has(c.name)
+  }
+  return c.tier === 'major'
+}
+
+function buildAsterisms(parent, layer) {
+  CONSTELLATIONS.filter((c) => shouldInclude(c, layer) && !constellationMap.has(c.name)).forEach((c) => {
+    const isPrimary = isPrimaryAsterism(c, layer)
+    const starOp = isPrimary ? 0.92 : 0.42
+    const haloOp = isPrimary ? 0.2 : 0.08
+    const lineOp = isPrimary ? 0.76 : 0.28
     const dirs = c.stars.map(([ra, dec, sz]) => ({
       dir: raDecToVec(ra, dec, 1).normalize(),
-      sz: sz || 1.2
+      sz: sz || (isPrimary ? 1.2 : 0.95)
     }))
     const center = new THREE.Vector3()
     dirs.forEach((p) => center.add(p.dir))
@@ -96,7 +119,9 @@ function buildEastCore(parent) {
       halos: [],
       lines: [],
       label: null,
-      center: pts[0].v.clone()
+      center: pts[0].v.clone(),
+      layer,
+      isPrimary
     }
     if (pts.length > 1) {
       entry.center = new THREE.Vector3()
@@ -111,7 +136,10 @@ function buildEastCore(parent) {
         fog: false,
         depthWrite: false
       })
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.32 * p.sz, 12, 12), mat)
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32 * p.sz * (isPrimary ? 1 : 0.88), 12, 12),
+        mat
+      )
       m.position.copy(p.v)
       m.renderOrder = -3
       m.userData.constellationName = c.name
@@ -125,7 +153,10 @@ function buildEastCore(parent) {
         fog: false,
         blending: THREE.AdditiveBlending
       })
-      const halo = new THREE.Mesh(new THREE.SphereGeometry(0.55 * p.sz, 10, 10), haloMat)
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55 * p.sz * (isPrimary ? 1 : 0.88), 10, 10),
+        haloMat
+      )
       halo.position.copy(p.v)
       halo.renderOrder = -3
       parent.add(halo)
@@ -145,12 +176,15 @@ function buildEastCore(parent) {
       parent.add(line)
       entry.lines.push(line)
     })
+    // 西象 minor / label:false 默认不贴名；高亮时仍可显名
+    const allowDefaultLabel = c.label !== false && c.tier !== 'minor'
     const li = c.labelAt ?? 0
     const label = makeSkyInscribe(c.name)
     const anchor = pts[Math.min(li, pts.length - 1)].v.clone()
     label.position.copy(anchor).multiplyScalar(1.018)
     label.position.y += 0.45
     label.userData.constellationName = c.name
+    label.visible = allowDefaultLabel && isPrimary && props.showLabels
     if (c.culture) {
       const el = label.userData.el
       el.classList.add('is-clickable')
@@ -174,17 +208,39 @@ function buildEastCore(parent) {
   })
 }
 
+function layerVisible(entryLayer, mode) {
+  if (mode === 'all') return true
+  return entryLayer === mode
+}
+
+function applyLayerVisibility() {
+  const mode = props.constellationMode || 'east'
+  if (eastGroup) eastGroup.visible = mode === 'east' || mode === 'all'
+  if (westGroup) westGroup.visible = mode === 'west' || mode === 'all'
+}
+
 function applyHighlight() {
+  const mode = props.constellationMode || 'east'
   const names = props.highlightNames || []
   const hasFocus = names.length > 0
   const focusSet = new Set(names)
 
   constellationMap.forEach((entry, name) => {
+    if (!layerVisible(entry.layer, mode)) return
     const active = focusSet.has(name)
     const dimmed = hasFocus && !active
-    const starOp = active ? 1 : dimmed ? 0.22 : 0.55
-    const haloOp = active ? 0.42 : dimmed ? 0.04 : 0.12
-    const lineOp = active ? 0.95 : dimmed ? 0.12 : 0.38
+    const isPrimary = entry.isPrimary
+    const starOp = active
+      ? 1
+      : dimmed
+        ? isPrimary
+          ? 0.18
+          : 0.06
+        : isPrimary
+          ? 0.55
+          : 0.22
+    const haloOp = active ? 0.42 : dimmed ? 0.03 : isPrimary ? 0.12 : 0.05
+    const lineOp = active ? 0.95 : dimmed ? (isPrimary ? 0.1 : 0.04) : isPrimary ? 0.38 : 0.16
     entry.stars.forEach((m) => {
       applyMaterialOpacity(m, starOp)
       if (active) m.scale.setScalar(1.35)
@@ -192,7 +248,10 @@ function applyHighlight() {
     })
     entry.halos.forEach((m) => applyMaterialOpacity(m, haloOp))
     entry.lines.forEach((l) => applyMaterialOpacity(l, lineOp))
-    setLabelHighlight(entry.label, active, dimmed)
+    if (entry.label) {
+      entry.label.visible = props.showLabels && (isPrimary || active)
+      setLabelHighlight(entry.label, active, dimmed && isPrimary)
+    }
   })
 
   if (hasFocus) {
@@ -200,7 +259,7 @@ function applyHighlight() {
     let count = 0
     names.forEach((n) => {
       const e = constellationMap.get(n)
-      if (e) {
+      if (e && layerVisible(e.layer, mode)) {
         desiredFocus.add(e.center)
         count += 1
       }
@@ -209,6 +268,14 @@ function applyHighlight() {
   } else {
     desiredFocus.set(0, 0, 0)
   }
+}
+
+async function ensureEastLayerReady() {
+  const mode = props.constellationMode || 'east'
+  if (mode !== 'east' && mode !== 'all') return
+  await ensureExtraAsterisms()
+  if (!mountedAlive || !eastGroup) return
+  buildAsterisms(eastGroup, 'east')
 }
 
 function placeCamera() {
@@ -310,9 +377,15 @@ onMounted(async () => {
     makeGalaxyBand(700, 175)
   ].forEach((s) => scene.add(s))
 
-  const skyGroup = new THREE.Group()
-  scene.add(skyGroup)
-  buildEastCore(skyGroup)
+  eastGroup = new THREE.Group()
+  westGroup = new THREE.Group()
+  scene.add(eastGroup)
+  scene.add(westGroup)
+  buildAsterisms(westGroup, 'west')
+  buildAsterisms(eastGroup, 'east')
+  await ensureEastLayerReady()
+  if (!mountedAlive) return
+  applyLayerVisibility()
   applyHighlight()
 
   ro = new ResizeObserver(resize)
@@ -345,13 +418,18 @@ onBeforeUnmount(() => {
   }
   renderer?.dispose()
   constellationMap.clear()
+  eastGroup = null
+  westGroup = null
 })
 
 watch(() => props.highlightNames, applyHighlight, { deep: true })
-watch(() => props.showLabels, (show) => {
-  constellationMap.forEach((entry) => {
-    if (entry.label) entry.label.visible = show
-  })
+watch(() => props.showLabels, () => {
+  applyHighlight()
+})
+watch(() => props.constellationMode, async () => {
+  await ensureEastLayerReady()
+  applyLayerVisibility()
+  applyHighlight()
 })
 </script>
 

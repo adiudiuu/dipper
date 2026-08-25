@@ -6,6 +6,8 @@
  */
 import * as THREE from 'three'
 import { CONSTELLATION_CULTURE } from './constellationCulture.js'
+import { WEST_CONSTELLATION_TIPS } from './westConstellationTips.js'
+import { getBuTianGeNoteForAsterism } from './buTianGe.js'
 
 /** 赤经(时) 赤纬(°) → 天球坐标 */
 export function raDecToVec(raHours, decDeg, radius) {
@@ -1146,24 +1148,42 @@ export const CONSTELLATIONS = [
   },
 ]
 
-/** 合并星官文化文案（east-core 等已录入者） */
-CONSTELLATIONS.forEach((c) => {
-  const culture = CONSTELLATION_CULTURE[c.name]
-  if (culture) c.culture = culture
-})
+/** 为星官/星座挂上教学向说明（西象 tips · 古象 culture · 步天歌附注） */
+function attachCulture(c) {
+  if (c.culture) return
+  const rich = CONSTELLATION_CULTURE[c.name]
+  if (rich) {
+    c.culture = rich
+    return
+  }
+  if (c.layer === 'west') {
+    const tip = WEST_CONSTELLATION_TIPS[c.name]
+    if (tip) c.culture = tip
+    return
+  }
+  const note = getBuTianGeNoteForAsterism(c.name)
+  if (note) {
+    c.culture = {
+      origin: note,
+      modernRef: '据《步天歌》歌诀附注整理，教学认星用，非占卜。'
+    }
+  }
+}
+
+/** 合并星官文化文案 */
+CONSTELLATIONS.forEach(attachCulture)
 
 let _extraLoaded = false
 
 /**
  * 动态加载古象繁（约 283 星官），避免首次加载即解析 2844 行数据。
- * 只在切换到「古象繁」或「全部」模式时才会被调用。
+ * 只在切换到「古象」或「全部」模式时才会被调用。
  */
 export async function ensureExtraAsterisms() {
   if (_extraLoaded) return
   const { EAST_EXTRA_ASTERISMS } = await import('./eastAsterisms.js')
   for (const a of EAST_EXTRA_ASTERISMS) {
-    const culture = CONSTELLATION_CULTURE[a.name]
-    if (culture) a.culture = culture
+    attachCulture(a)
     CONSTELLATIONS.push(a)
   }
   _extraLoaded = true
@@ -1183,6 +1203,7 @@ export const PLANETS = [
   {
     id: 'mercury',
     name: '水星',
+    wuxing: '水',
     orbit: 6.4,
     size: 0.32,
     color: 0xb0b4ba,
@@ -1195,6 +1216,7 @@ export const PLANETS = [
   {
     id: 'venus',
     name: '金星',
+    wuxing: '金',
     orbit: 11.6,
     size: 0.48,
     color: 0xe8d5a0,
@@ -1208,6 +1230,7 @@ export const PLANETS = [
   {
     id: 'mars',
     name: '火星',
+    wuxing: '火',
     orbit: 24.4,
     size: 0.4,
     color: 0xc45c3e,
@@ -1220,6 +1243,7 @@ export const PLANETS = [
   {
     id: 'jupiter',
     name: '木星',
+    wuxing: '木',
     orbit: 32.5,
     size: 1.05,
     color: 0xd4b896,
@@ -1232,6 +1256,7 @@ export const PLANETS = [
   {
     id: 'saturn',
     name: '土星',
+    wuxing: '土',
     orbit: 40.5,
     size: 0.9,
     color: 0xe0d0a8,

@@ -36,9 +36,9 @@ const props = defineProps({
   moonAge: { type: Number, required: true },
   currentMs: { type: Number, required: true },
   currentTerm: { type: String, default: '' },
-  /** 星象层：west 西象 | east-core 古象纲 | east 古象繁 | all 全部 */
+  /** 星象层：west 西象 | east 古象（core+extra）| all 两层同显；east-core 内部兼容 */
   constellationMode: { type: String, default: 'east' },
-  /** 古象标签：繁/全部下可隐名控遮挡；纲模式始终显名 */
+  /** 星象层名称显隐（西象/古象均生效） */
   eastLabels: { type: Boolean, default: true },
   /** 视角：orbit 轨透视 | ground 地面观星 */
   viewMode: { type: String, default: 'orbit' },
@@ -142,6 +142,7 @@ let skyEastGroup = null
 let skyEastExtraGroup = null
 let skyDome = null
 let eastLabelObjects = []
+let westLabelObjects = []
 let culturePickMeshes = []
 let groundHorizon = null
 let groundSceneActive = false
@@ -175,10 +176,13 @@ async function applyConstellationMode() {
 
 function applyEastLabels() {
   const mode = props.constellationMode || 'east'
-  // 纲：骨架贴名；繁/全部：跟随显名开关（仅 core+名星有标签对象）
+  // east-core：骨架贴名；其余模式跟随题名/隐名开关（西象与古象均生效）
   const show = mode === 'east-core' || props.eastLabels !== false
   eastLabelObjects.forEach((lab) => {
     lab.visible = show
+  })
+  westLabelObjects.forEach((lab) => {
+    lab.visible = props.eastLabels !== false
   })
 }
 
@@ -648,6 +652,7 @@ function buildConstellationLayer(parent, layer, tier) {
     }
     parent.add(label)
     if (layer === 'east') eastLabelObjects.push(label)
+    else if (layer === 'west') westLabelObjects.push(label)
   })
 }
 
@@ -688,7 +693,8 @@ async function buildPlanets(parent, texMap) {
       ring.rotation.x = Math.PI / 2.35
       body.add(ring)
     }
-    const label = makeTextSprite(p.name, {
+    const labelText = p.wuxing ? `${p.name} · ${p.wuxing}` : p.name
+    const label = makeTextSprite(labelText, {
       color: p.dwarf ? '#C8B898' : '#D8D2C4',
       fontSize: p.dwarf ? 16 : 20,
       fontWeight: 500,
@@ -808,6 +814,7 @@ onMounted(async () => {
   skyRoot.add(skyEastGroup)
   skyEastGroup.add(skyEastExtraGroup)
   eastLabelObjects = []
+  westLabelObjects = []
   culturePickMeshes.length = 0
   scrubCtx.culturePickMeshes = culturePickMeshes
   buildConstellationLayer(skyWestGroup, 'west')
@@ -1434,9 +1441,10 @@ function updateGroundHud() {
 .ground-hud {
   position: absolute;
   left: 50%;
-  bottom: calc(1rem + var(--safe-bottom, 0px));
+  /* 抬高以免被 AppFooter 底栏遮挡方位/仰角读数 */
+  bottom: calc(2.85rem + var(--safe-bottom, 0px));
   transform: translateX(-50%);
-  z-index: 3;
+  z-index: 5;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -1508,7 +1516,7 @@ function updateGroundHud() {
 
 @media (max-width: 720px) {
   .ground-hud {
-    bottom: calc(0.6rem + var(--safe-bottom, 0px));
+    bottom: calc(2.55rem + var(--safe-bottom, 0px));
   }
   .hud-svg {
     width: 4.9rem;

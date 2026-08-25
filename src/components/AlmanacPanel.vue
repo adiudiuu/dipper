@@ -12,6 +12,7 @@ defineProps({
   isLeapMonth: { type: Boolean, default: false },
   daoYearText: { type: String, required: true },
   suiXing: { type: Object, required: true },
+  sizhu: { type: Object, default: null },
   currentTerm: { type: String, required: true },
   termIntoDays: { type: Number, required: true },
   termSub: { type: String, required: true },
@@ -64,6 +65,7 @@ defineExpose({ resetFestivals })
             :is-leap-month="isLeapMonth"
             :dao-year-text="daoYearText"
             :sui-xing="suiXing"
+            :sizhu="sizhu"
           />
           <AlmanacJieqi
             :current-term="currentTerm"

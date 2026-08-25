@@ -3,7 +3,9 @@ defineProps({
   lunarMainText: { type: String, required: true },
   isLeapMonth: { type: Boolean, default: false },
   daoYearText: { type: String, required: true },
-  suiXing: { type: Object, required: true }
+  suiXing: { type: Object, required: true },
+  /** 干支四柱：{ year, month, day, hour }，hour 含 note */
+  sizhu: { type: Object, default: null }
 })
 </script>
 
@@ -22,6 +24,29 @@ defineProps({
           :title="suiXing.lon != null ? `木星地心黄经约 ${suiXing.lon.toFixed(1)}°` : undefined"
         >{{ suiXing.text }}</span>
       </template>
+    </div>
+
+    <div v-if="sizhu?.year" class="sizhu" title="干支四柱为传统纪时，教学展示，非运势推算">
+      <div class="sec-label sizhu-label">干支四柱</div>
+      <div class="sizhu-row" role="list">
+        <div class="sizhu-cell" role="listitem">
+          <span class="sizhu-gz">{{ sizhu.year.text }}</span>
+          <span class="sizhu-tag">年柱</span>
+        </div>
+        <div class="sizhu-cell" role="listitem">
+          <span class="sizhu-gz">{{ sizhu.month.text }}</span>
+          <span class="sizhu-tag">月柱</span>
+        </div>
+        <div class="sizhu-cell" role="listitem">
+          <span class="sizhu-gz">{{ sizhu.day.text }}</span>
+          <span class="sizhu-tag">日柱</span>
+        </div>
+        <div class="sizhu-cell" role="listitem">
+          <span class="sizhu-gz">{{ sizhu.hour.text }}</span>
+          <span class="sizhu-tag">时柱</span>
+        </div>
+      </div>
+      <div v-if="sizhu.hour?.note" class="sizhu-note">{{ sizhu.hour.note }}</div>
     </div>
   </section>
 </template>
@@ -69,6 +94,58 @@ defineProps({
   letter-spacing: 0.12em;
   vertical-align: middle;
   background: rgba(196, 164, 90, 0.06);
+  line-height: 1.35;
+}
+
+.sizhu {
+  margin-top: 0.42rem;
+  padding-top: 0.38rem;
+  border-top: 1px solid var(--rule);
+}
+
+.sizhu-label {
+  margin-bottom: 0.22rem;
+}
+
+.sizhu-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 0.2rem;
+}
+
+.sizhu-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.sizhu-gz {
+  font-family: var(--font-serif);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-shadow: var(--text-glow);
+}
+
+.sizhu-tag {
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  color: var(--qing-mute);
+  line-height: 1;
+}
+
+.sizhu-note {
+  margin-top: 0.28rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-align: center;
   line-height: 1.35;
 }
 </style>
