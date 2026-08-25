@@ -3,29 +3,20 @@ import { computed, nextTick, ref } from 'vue'
 import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import {
-  getTimelineEntries,
-  getTimelineEras,
-  timelineStats
-} from '../lib/astronomerTimeline.js'
+  calendarEvolutionStats,
+  getCalendarStageGroups
+} from '../lib/calendarEvolution.js'
 
-const entries = getTimelineEntries()
-const stats = timelineStats()
-const eras = getTimelineEras()
+const stageGroups = getCalendarStageGroups()
+const stats = calendarEvolutionStats()
 const expandedId = ref(null)
 const trackRef = ref(null)
 const itemRefs = ref({})
 
-const expandedEntry = computed(() =>
-  entries.find((e) => e.id === expandedId.value) ?? null
-)
+const flatPeople = computed(() => stageGroups.flatMap((g) => g.people))
 
-const eraGroups = computed(() =>
-  eras
-    .map((era) => ({
-      ...era,
-      people: entries.filter((e) => era.match(e.era))
-    }))
-    .filter((g) => g.people.length > 0)
+const expandedEntry = computed(() =>
+  flatPeople.value.find((e) => e.id === expandedId.value) ?? null
 )
 
 function setItemRef(id, el) {
@@ -44,21 +35,22 @@ function selectEntry(id) {
   })
 }
 
-function jumpEra(eraId) {
-  const group = eraGroups.value.find((g) => g.id === eraId)
+function jumpStage(stageId) {
+  const group = stageGroups.find((g) => g.stage.id === stageId)
   const first = group?.people?.[0]
   if (!first) return
   selectEntry(first.id)
 }
 
 function stepEntry(delta) {
-  const idx = entries.findIndex((e) => e.id === expandedId.value)
+  const list = flatPeople.value
+  const idx = list.findIndex((e) => e.id === expandedId.value)
   if (idx < 0) {
-    if (entries.length) selectEntry(entries[0].id)
+    if (list.length) selectEntry(list[0].id)
     return
   }
-  const next = (idx + delta + entries.length) % entries.length
-  selectEntry(entries[next].id)
+  const next = (idx + delta + list.length) % list.length
+  selectEntry(list[next].id)
 }
 </script>
 
@@ -68,33 +60,34 @@ function stepEntry(delta) {
     <AppHeader />
 
     <main class="timeline-main">
-      <aside class="intro-panel glass-panel" aria-label="时间线导览">
+      <aside class="intro-panel glass-panel" aria-label="历法演进导览">
         <p class="intro-text">
-          自先秦星经至清钦天监，中国天文历算以<strong>实测</strong>修正、以<strong>仪器</strong>观象、以<strong>常数</strong>推步。
-          点侧栏或节点展开生平与成就。
+          中国历法并非一成不变：<strong>回归年长度</strong>、<strong>日月视运动</strong>与<strong>观测精度</strong>一旦与旧常数偏离，就需要改历。
+          羲和主线按历法阶段组织人物，点侧栏或卡片展开详情。
         </p>
         <div class="intro-meta">
+          <span class="meta-chip">{{ stats.stageCount }} 个阶段</span>
           <span class="meta-chip">共 {{ stats.count }} 位</span>
           <span class="meta-chip">约 {{ stats.span }}</span>
         </div>
 
-        <div class="era-nav" aria-label="时代分期">
-          <h3 class="side-label">时代</h3>
+        <div class="era-nav" aria-label="历法阶段">
+          <h3 class="side-label">历法阶段</h3>
           <div class="era-chips">
             <button
-              v-for="g in eraGroups"
-              :key="g.id"
+              v-for="g in stageGroups"
+              :key="g.stage.id"
               type="button"
               class="era-chip"
-              @click="jumpEra(g.id)"
-            >{{ g.label }} · {{ g.people.length }}</button>
+              @click="jumpStage(g.stage.id)"
+            >{{ g.stage.title.split(' · ')[0] }} · {{ g.people.length }}</button>
           </div>
         </div>
 
         <div class="name-roll" aria-label="人物速览">
           <h3 class="side-label">人物</h3>
           <ul class="name-list">
-            <li v-for="entry in entries" :key="entry.id">
+            <li v-for="entry in flatPeople" :key="entry.id">
               <button
                 type="button"
                 class="name-btn"
@@ -112,65 +105,94 @@ function stepEntry(delta) {
       <section
         ref="trackRef"
         class="timeline-track glass-panel"
-        aria-label="天文学家时间线"
+        aria-label="历法演进时间线"
       >
-        <ol class="timeline-list">
-          <li
-            v-for="(entry, index) in entries"
-            :key="entry.id"
-            :ref="(el) => setItemRef(entry.id, el)"
-            class="timeline-item"
-            :class="{ expanded: expandedId === entry.id }"
-          >
-            <div class="rail">
-              <span class="rail-dot" aria-hidden="true" />
-              <span v-if="index < entries.length - 1" class="rail-line" aria-hidden="true" />
+        <article
+          v-for="group in stageGroups"
+          :key="group.stage.id"
+          class="stage-block"
+        >
+          <header class="stage-head">
+            <div class="stage-title-wrap">
+              <h2 class="stage-title">{{ group.stage.title }}</h2>
+              <span class="stage-period">{{ group.stage.period }}</span>
             </div>
+            <div class="stage-cal-tags">
+              <span
+                v-for="cal in group.stage.calendars"
+                :key="cal"
+                class="stage-cal-tag"
+              >{{ cal }}</span>
+            </div>
+            <p class="stage-intro">{{ group.stage.intro }}</p>
+            <div class="stage-why">
+              <span class="why-label">为何改历</span>
+              <p class="why-text">{{ group.stage.whyReform }}</p>
+            </div>
+          </header>
 
-            <article class="node-card">
-              <button
-                type="button"
-                class="node-head"
-                :aria-expanded="expandedId === entry.id"
-                @click="toggleEntry(entry.id)"
-              >
-                <div class="node-title-wrap">
-                  <h2 class="node-name">{{ entry.name }}</h2>
-                  <span class="node-era">{{ entry.era }}</span>
-                </div>
-                <span class="node-dates">{{ entry.dates }}</span>
-                <span class="node-chevron" aria-hidden="true">{{ expandedId === entry.id ? '−' : '+' }}</span>
-              </button>
+          <ol class="timeline-list">
+            <li
+              v-for="(entry, index) in group.people"
+              :key="entry.id"
+              :ref="(el) => setItemRef(entry.id, el)"
+              class="timeline-item"
+              :class="{ expanded: expandedId === entry.id }"
+            >
+              <div class="rail">
+                <span class="rail-dot" aria-hidden="true" />
+                <span
+                  v-if="index < group.people.length - 1"
+                  class="rail-line"
+                  aria-hidden="true"
+                />
+              </div>
 
-              <div v-show="expandedId === entry.id" class="node-body">
-                <p class="node-bio">{{ entry.bio }}</p>
+              <article class="node-card">
+                <button
+                  type="button"
+                  class="node-head"
+                  :aria-expanded="expandedId === entry.id"
+                  @click="toggleEntry(entry.id)"
+                >
+                  <div class="node-title-wrap">
+                    <h3 class="node-name">{{ entry.name }}</h3>
+                    <span class="node-era">{{ entry.era }}</span>
+                  </div>
+                  <span class="node-dates">{{ entry.dates }}</span>
+                  <span class="node-chevron" aria-hidden="true">{{ expandedId === entry.id ? '−' : '+' }}</span>
+                </button>
 
-                <div v-if="entry.achievements?.length" class="node-section">
-                  <h3 class="section-label">主要成就</h3>
-                  <ul class="achievement-list">
-                    <li v-for="(item, i) in entry.achievements" :key="i">{{ item }}</li>
-                  </ul>
-                </div>
+                <div v-show="expandedId === entry.id" class="node-body">
+                  <p class="node-bio">{{ entry.bio }}</p>
 
-                <div v-if="entry.relatedCalendars?.length" class="node-section">
-                  <h3 class="section-label">相关历法</h3>
-                  <div class="calendar-tags">
-                    <span
-                      v-for="cal in entry.relatedCalendars"
-                      :key="cal"
-                      class="cal-tag"
-                    >{{ cal }}</span>
+                  <div v-if="entry.achievements?.length" class="node-section">
+                    <h4 class="section-label">主要成就</h4>
+                    <ul class="achievement-list">
+                      <li v-for="(item, i) in entry.achievements" :key="i">{{ item }}</li>
+                    </ul>
+                  </div>
+
+                  <div v-if="entry.relatedCalendars?.length" class="node-section">
+                    <h4 class="section-label">相关历法</h4>
+                    <div class="calendar-tags">
+                      <span
+                        v-for="cal in entry.relatedCalendars"
+                        :key="cal"
+                        class="cal-tag"
+                      >{{ cal }}</span>
+                    </div>
+                  </div>
+
+                  <div class="node-nav" role="group" aria-label="浏览相邻人物">
+                    <button type="button" class="nav-btn" @click.stop="stepEntry(-1)">‹ 上一位</button>
+                    <button type="button" class="nav-btn" @click.stop="stepEntry(1)">下一位 ›</button>
                   </div>
                 </div>
-
-                <div class="node-nav" role="group" aria-label="浏览相邻人物">
-                  <button type="button" class="nav-btn" @click.stop="stepEntry(-1)">‹ 上一位</button>
-                  <button type="button" class="nav-btn" @click.stop="stepEntry(1)">下一位 ›</button>
-                </div>
-              </div>
-            </article>
-          </li>
-        </ol>
+              </article>
+            </li>
+          </ol>
+        </article>
       </section>
     </main>
 
@@ -357,6 +379,89 @@ function stepEntry(delta) {
   overflow-y: auto;
   padding: 0.45rem 0.55rem 0.65rem;
   -webkit-overflow-scrolling: touch;
+}
+
+.stage-block + .stage-block {
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(90, 138, 140, 0.16);
+}
+
+.stage-head {
+  margin-bottom: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid rgba(184, 150, 74, 0.22);
+  border-radius: 0.35rem;
+  background: rgba(184, 150, 74, 0.05);
+}
+
+.stage-title-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+}
+
+.stage-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 0.88rem;
+  letter-spacing: 0.14em;
+  color: #ebdaa8;
+  font-weight: 600;
+}
+
+.stage-period {
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: rgba(110, 154, 156, 0.75);
+}
+
+.stage-cal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-top: 0.38rem;
+}
+
+.stage-cal-tag {
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  padding: 0.12rem 0.38rem;
+  border: 1px solid rgba(90, 138, 140, 0.22);
+  border-radius: 0.25rem;
+  color: rgba(110, 154, 156, 0.85);
+  background: rgba(14, 22, 32, 0.45);
+}
+
+.stage-intro {
+  margin: 0.45rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  color: rgba(201, 194, 176, 0.75);
+}
+
+.stage-why {
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed rgba(90, 138, 140, 0.14);
+}
+
+.why-label {
+  display: block;
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  color: rgba(196, 164, 90, 0.82);
+  margin-bottom: 0.22rem;
+}
+
+.why-text {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.65;
+  letter-spacing: 0.03em;
+  color: rgba(201, 194, 176, 0.62);
 }
 
 .timeline-list {

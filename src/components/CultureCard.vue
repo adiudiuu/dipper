@@ -1,5 +1,9 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { getConstellationByName } from '../lib/sky.js'
+
+const props = defineProps({
   open: { type: Boolean, default: false },
   name: { type: String, default: '' },
   culture: { type: Object, default: null }
@@ -7,11 +11,25 @@ defineProps({
 
 const emit = defineEmits(['close'])
 
+const router = useRouter()
+
 const SECTIONS = [
   { key: 'origin', label: '由来' },
   { key: 'myth', label: '典故' },
   { key: 'modernRef', label: '今用' }
 ]
+
+const showOrbitLink = computed(() => {
+  if (!props.name) return false
+  const c = getConstellationByName(props.name)
+  return c?.layer === 'east'
+})
+
+function goOrbit() {
+  if (!props.name) return
+  emit('close')
+  router.push({ path: '/', query: { star: props.name } })
+}
 </script>
 
 <template>
@@ -54,6 +72,12 @@ const SECTIONS = [
           </div>
 
           <footer class="culture-foot">
+            <button
+              v-if="showOrbitLink"
+              type="button"
+              class="orbit-link-btn"
+              @click="goOrbit"
+            >在轨道页查看此星官 ›</button>
             <span class="foot-note">教学科普 · 非占卜预测</span>
           </footer>
         </div>
@@ -198,8 +222,31 @@ const SECTIONS = [
 
 .culture-foot {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
   padding: 0.45rem 0.95rem 0.65rem;
   border-top: 1px solid rgba(90, 138, 140, 0.12);
+}
+
+.orbit-link-btn {
+  appearance: none;
+  align-self: flex-start;
+  border: 1px solid rgba(184, 150, 74, 0.4);
+  background: rgba(184, 150, 74, 0.08);
+  color: var(--jin);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  padding: 0.38rem 0.7rem;
+  min-height: var(--tap-min, 2.75rem);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.orbit-link-btn:hover {
+  border-color: rgba(196, 164, 90, 0.65);
+  background: rgba(184, 150, 74, 0.14);
 }
 
 .foot-note {

@@ -46,7 +46,9 @@ const props = defineProps({
   observerLat: { type: Number, default: 39.9 },
   observerLon: { type: Number, default: 116.4 },
   /** 窄屏：降标签密度、短行星名、远距/叠日隐藏 */
-  compactLabels: { type: Boolean, default: false }
+  compactLabels: { type: Boolean, default: false },
+  /** 高亮星官/星座名（来自列宿页跳转） */
+  highlightNames: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['scrub', 'culture-open'])
@@ -156,6 +158,80 @@ let bodyLabelSprites = []
 const _projA = new THREE.Vector3()
 const _projB = new THREE.Vector3()
 let labelCullClock = 0
+/** @type {Map<string, { stars: THREE.Mesh[], halos: THREE.Mesh[], lines: THREE.Line[], label: import('three/examples/jsm/renderers/CSS2DRenderer.js').CSS2DObject | null, center: THREE.Vector3, layer: string, quiet: boolean }>} */
+const constellationMap = new Map()
+let focusTarget = new THREE.Vector3(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
+let desiredFocus = new THREE.Vector3(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
+
+function applyMaterialOpacity(mesh, opacity) {
+  if (!mesh?.material) return
+  mesh.material.opacity = opacity
+  mesh.material.transparent = true
+}
+
+function setSkyLabelHighlight(label, active, dimmed) {
+  if (!label?.userData?.el) return
+  const el = label.userData.el
+  el.classList.toggle('is-active', active)
+  el.classList.toggle('is-dim', dimmed && !active)
+}
+
+function layerVisibleForHighlight(entryLayer, mode) {
+  if (mode === 'all') return true
+  if (mode === 'east' || mode === 'east-core') return entryLayer === 'east'
+  return entryLayer === mode
+}
+
+function applyConstellationHighlight() {
+  const mode = props.constellationMode || 'east'
+  const names = props.highlightNames || []
+  const hasFocus = names.length > 0
+  const focusSet = new Set(names)
+
+  constellationMap.forEach((entry, name) => {
+    if (!layerVisibleForHighlight(entry.layer, mode)) return
+    const active = focusSet.has(name)
+    const dimmed = hasFocus && !active
+    const quiet = entry.quiet
+    const starOp = active ? 1 : dimmed ? (quiet ? 0.08 : 0.15) : quiet ? 0.72 : 0.96
+    const haloOp = active ? 0.42 : dimmed ? 0.04 : quiet ? 0.12 : 0.22
+    const lineOp = active ? 0.95 : dimmed ? 0.08 : quiet ? 0.42 : 0.78
+    entry.stars.forEach((m) => {
+      applyMaterialOpacity(m, starOp)
+      m.scale.setScalar(active ? 1.35 : 1)
+    })
+    entry.halos.forEach((m) => applyMaterialOpacity(m, haloOp))
+    entry.lines.forEach((l) => applyMaterialOpacity(l, lineOp))
+    if (entry.label) {
+      entry.label.visible = props.eastLabels !== false && (!quiet || active || !dimmed)
+      setSkyLabelHighlight(entry.label, active, dimmed)
+    }
+  })
+
+  if (hasFocus) {
+    desiredFocus.set(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
+    let count = 0
+    names.forEach((n) => {
+      const e = constellationMap.get(n)
+      if (e && layerVisibleForHighlight(e.layer, mode)) {
+        desiredFocus.add(e.center)
+        count += 1
+      }
+    })
+    if (count > 0) {
+      desiredFocus.x /= count + 1
+      desiredFocus.y /= count + 1
+      desiredFocus.z /= count + 1
+    }
+  } else {
+    desiredFocus.set(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
+  }
+}
+
+function focusConstellation(name) {
+  if (!name) return
+  applyConstellationHighlight()
+}
 
 function isCompactLabels() {
   if (props.compactLabels) return true
@@ -199,6 +275,7 @@ async function applyConstellationMode() {
     if (!mountedAlive) return
   }
   applyEastLabels()
+  applyConstellationHighlight()
 }
 
 function applyEastLabels() {
@@ -347,6 +424,8 @@ function resetCamera() {
   camera.fov = CAM_INIT_FOV
   camera.updateProjectionMatrix()
   placeCamera()
+  desiredFocus.set(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
+  focusTarget.set(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
   controls.target.set(FRAME_TARGET.x, FRAME_TARGET.y, FRAME_TARGET.z)
   controls.update()
 }
@@ -381,7 +460,7 @@ function setupControls(dom) {
   return c
 }
 
-defineExpose({ resetCamera })
+defineExpose({ resetCamera, focusConstellation })
 
 function makeFallbackTex(draw, size) {
   const c = document.createElement('canvas')
@@ -671,6 +750,10 @@ function animate(now) {
     })
   }
   controls?.update()
+  focusTarget.lerp(desiredFocus, Math.min(1, dt * 2.2))
+  if (controls && props.viewMode !== 'ground') {
+    controls.target.lerp(focusTarget, Math.min(1, dt * 2.2))
+  }
   syncGroundSky()
   updateGroundHud()
   labelCullClock += dt
@@ -725,6 +808,7 @@ function buildConstellationLayer(parent, layer, tier) {
     if (tier && (c.tier || 'major') !== tier) return false
     return true
   }).forEach((c) => {
+    if (constellationMap.has(c.name)) return
     const quiet = c.tier === 'minor' || c.tier === 'extra'
     const dim = quiet && c.label === false
     const starOp = dim ? 0.55 : quiet ? 0.72 : 0.96
@@ -734,7 +818,6 @@ function buildConstellationLayer(parent, layer, tier) {
       dir: raDecToVec(ra, dec, 1).normalize(),
       sz: (sz || 1.2) * (dim ? 0.78 : quiet ? 0.88 : 1)
     }))
-    // 向星座质心收拢张角，再投到天球；标签锚点跟收拢后的位置走
     const center = new THREE.Vector3()
     dirs.forEach((p) => center.add(p.dir))
     if (center.lengthSq() > 1e-8) center.normalize()
@@ -747,6 +830,20 @@ function buildConstellationLayer(parent, layer, tier) {
         .multiplyScalar(SKY_R),
       sz: p.sz
     }))
+    const entry = {
+      stars: [],
+      halos: [],
+      lines: [],
+      label: null,
+      center: pts[0]?.v?.clone() || new THREE.Vector3(),
+      layer,
+      quiet
+    }
+    if (pts.length > 1) {
+      entry.center = new THREE.Vector3()
+      pts.forEach((p) => entry.center.add(p.v))
+      entry.center.divideScalar(pts.length)
+    }
     pts.forEach((p) => {
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(0.28 * p.sz, 12, 12),
@@ -763,6 +860,7 @@ function buildConstellationLayer(parent, layer, tier) {
       m.userData.constellation = c
       if (c.culture) culturePickMeshes.push(m)
       parent.add(m)
+      entry.stars.push(m)
       const halo = new THREE.Mesh(
         new THREE.SphereGeometry(0.5 * p.sz, 10, 10),
         new THREE.MeshBasicMaterial({
@@ -777,6 +875,7 @@ function buildConstellationLayer(parent, layer, tier) {
       halo.position.copy(p.v)
       halo.renderOrder = -3
       parent.add(halo)
+      entry.halos.push(halo)
     })
     c.lines.forEach(([a, b]) => {
       const geo = new THREE.BufferGeometry().setFromPoints([pts[a].v, pts[b].v])
@@ -792,38 +891,43 @@ function buildConstellationLayer(parent, layer, tier) {
       )
       line.renderOrder = -3
       parent.add(line)
+      entry.lines.push(line)
     })
-    // minor / label:false 不贴名；extra 名星淡铭；major/core 正常
     const showLabel = c.label !== false && c.tier !== 'minor'
-    if (!showLabel) return
-    const li = c.labelAt ?? 0
-    const label = makeSkyInscribe(c.name)
-    if (quiet) label.userData.el.classList.add('is-quiet')
-    const anchor = pts[Math.min(li, pts.length - 1)].v.clone()
-    label.position.copy(anchor).multiplyScalar(1.018)
-    label.position.y += 0.45
-    if (c.culture) {
-      label.userData.constellation = c
-      const el = label.userData.el
-      el.classList.add('is-clickable')
-      el.setAttribute('role', 'button')
-      el.setAttribute('tabindex', '0')
-      el.setAttribute('aria-label', `${c.name} 星官故事`)
-      el.addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        openCulture(c)
-      })
-      el.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault()
+    let label = null
+    if (showLabel) {
+      const li = c.labelAt ?? 0
+      label = makeSkyInscribe(c.name)
+      if (quiet) label.userData.el.classList.add('is-quiet')
+      const anchor = pts[Math.min(li, pts.length - 1)].v.clone()
+      label.position.copy(anchor).multiplyScalar(1.018)
+      label.position.y += 0.45
+      if (c.culture) {
+        label.userData.constellation = c
+        const el = label.userData.el
+        el.classList.add('is-clickable')
+        el.setAttribute('role', 'button')
+        el.setAttribute('tabindex', '0')
+        el.setAttribute('aria-label', `${c.name} 星官故事`)
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation()
           openCulture(c)
-        }
-      })
+        })
+        el.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault()
+            openCulture(c)
+          }
+        })
+      }
+      parent.add(label)
+      if (layer === 'east') eastLabelObjects.push(label)
+      else if (layer === 'west') westLabelObjects.push(label)
     }
-    parent.add(label)
-    if (layer === 'east') eastLabelObjects.push(label)
-    else if (layer === 'west') westLabelObjects.push(label)
+    entry.label = label
+    constellationMap.set(c.name, entry)
   })
+  applyConstellationHighlight()
 }
 
 async function buildPlanets(parent, texMap) {
@@ -1316,7 +1420,11 @@ onBeforeUnmount(() => {
 watch(() => [props.sunLon, props.moonAge, props.currentTerm, props.observerLat, props.observerLon], syncOrbits)
 // 地面 currentMs → animate 内 syncGroundSky；轨道行星跟 sunLon/moonAge/日期读数
 watch(() => props.constellationMode, applyConstellationMode)
-watch(() => props.eastLabels, applyEastLabels)
+watch(() => props.eastLabels, () => {
+  applyEastLabels()
+  applyConstellationHighlight()
+})
+watch(() => props.highlightNames, applyConstellationHighlight, { deep: true })
 watch(() => props.compactLabels, () => {
   applyEastLabels()
   updateLabelDensity()
@@ -1592,6 +1700,16 @@ function updateGroundHud() {
   text-shadow:
     0 1px 2px rgba(6, 10, 16, 0.45),
     0 0 8px rgba(184, 150, 74, 0.22);
+}
+.orbit-labels .sky-inscribe.is-active {
+  color: rgba(235, 218, 168, 0.98);
+  font-weight: 600;
+  text-shadow:
+    0 1px 2px rgba(6, 10, 16, 0.45),
+    0 0 10px rgba(184, 150, 74, 0.28);
+}
+.orbit-labels .sky-inscribe.is-dim {
+  opacity: 0.42;
 }
 
 @media (max-width: 720px) {

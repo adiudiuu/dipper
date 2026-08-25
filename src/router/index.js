@@ -24,6 +24,12 @@ const routes = [
     name: 'timeline',
     component: () => import('../views/TimelineView.vue'),
     meta: { title: '七政 · 羲和' }
+  },
+  {
+    path: '/topic/jieqi/:slug',
+    name: 'jieqi-topic',
+    component: () => import('../views/JieqiTopicView.vue'),
+    meta: { title: '七政 · 节气专题' }
   }
 ]
 

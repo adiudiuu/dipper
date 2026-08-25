@@ -1,13 +1,25 @@
 <script setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { JIEQI } from '../lib/calendar.js'
+import { getJieqiTopicSlug } from '../data/jieqiTopics.js'
 
 const props = defineProps({
   currentTerm: { type: String, required: true }
 })
 
+const emit = defineEmits(['open-topic'])
+
+const router = useRouter()
 const scroller = ref(null)
 const terms = JIEQI
+
+function openTopic(termName) {
+  const slug = getJieqiTopicSlug(termName)
+  if (!slug) return
+  emit('open-topic', termName)
+  router.push({ name: 'jieqi-topic', params: { slug } })
+}
 
 async function scrollCurrentIntoView(smooth = true) {
   await nextTick()
@@ -34,9 +46,10 @@ onMounted(() => {
 <template>
   <div class="jieqi-strip" aria-label="二十四节气">
     <div ref="scroller" class="jieqi-strip-scroll" role="list">
-      <span
+      <button
         v-for="jq in terms"
         :key="jq.name"
+        type="button"
         role="listitem"
         class="jieqi-chip"
         :class="{
@@ -44,7 +57,10 @@ onMounted(() => {
           'is-zhong': jq.zhong
         }"
         :data-current="jq.name === currentTerm ? '1' : undefined"
-      >{{ jq.name }}</span>
+        :aria-label="`${jq.name} 节气科普`"
+        :title="`阅读 ${jq.name} 专题`"
+        @click="openTopic(jq.name)"
+      >{{ jq.name }}</button>
     </div>
   </div>
 </template>
@@ -84,6 +100,7 @@ onMounted(() => {
 }
 
 .jieqi-chip {
+  appearance: none;
   flex: 0 0 auto;
   font-family: var(--font-serif);
   font-size: 0.62rem;
@@ -97,6 +114,15 @@ onMounted(() => {
   backdrop-filter: blur(6px);
   white-space: nowrap;
   user-select: none;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.jieqi-chip:hover {
+  color: rgba(201, 168, 104, 0.92);
+  border-color: rgba(184, 150, 74, 0.35);
+  background: rgba(184, 150, 74, 0.08);
 }
 
 .jieqi-chip.is-zhong {

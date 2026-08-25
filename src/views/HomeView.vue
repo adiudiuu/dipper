@@ -1,5 +1,6 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import SceneLoadingPlaceholder from '../components/SceneLoadingPlaceholder.vue'
 
 const OrbitScene = defineAsyncComponent({
@@ -27,7 +28,11 @@ import {
   phaseName
 } from '../lib/calendar.js'
 import { getFestivalsOn } from '../lib/festivals.js'
-import { formatSuiXing } from '../lib/sky.js'
+import { enrichEvent, getEventsOn, parseDateQuery } from '../lib/celestialEvents.js'
+import { formatSuiXing, resolveAsterismName } from '../lib/sky.js'
+
+const route = useRoute()
+const router = useRouter()
 
 const DESKTOP_MQ = '(min-width: 721px)'
 const MOBILE_HINT_KEY = 'dipper.mobileHintDismissed'
@@ -132,6 +137,13 @@ const almanacRef = ref(null)
 const cultureOpen = ref(false)
 const cultureName = ref('')
 const cultureData = ref(null)
+const starHighlightNames = ref([])
+const starFocusHint = ref('')
+
+const starFocusBanner = computed(() => {
+  if (!starFocusHint.value) return ''
+  return starFocusHint.value
+})
 
 function onCultureOpen(payload) {
   cultureName.value = payload.name
@@ -231,6 +243,22 @@ const todayFestivals = computed(() => {
   }
 })
 
+const todayCelestialEvents = computed(() => {
+  try {
+    return getEventsOn(ymd.value.y, ymd.value.m, ymd.value.d).map((ev) =>
+      enrichEvent(ev, ymd.value.y, ymd.value.m, ymd.value.d)
+    )
+  } catch {
+    return []
+  }
+})
+
+const activeCelestialHint = computed(() => {
+  const high = todayCelestialEvents.value.filter((ev) => ev.precisionLevel === 'high')
+  if (!high.length) return ''
+  return high[0].precisionNote || '本页日月食等为教学示意，非精确预报。'
+})
+
 const dateInputValue = computed({
   get() {
     const { y, m, d } = ymd.value
@@ -259,7 +287,15 @@ function goDefaults() {
   observerPlace.value = LOCATIONS[0].name
   timeSpeedIdx.value = DEFAULT_SPEED_IDX
   lixiangOpen.value = defaultLixiangOpen()
+  starHighlightNames.value = []
+  starFocusHint.value = ''
   setDate(Date.now())
+  if (route.query.date || route.query.star) {
+    const nextQuery = { ...route.query }
+    delete nextQuery.date
+    delete nextQuery.star
+    router.replace({ path: '/', query: nextQuery })
+  }
   nextTick(() => {
     orbitSceneRef.value?.resetCamera?.()
     almanacRef.value?.resetFestivals?.()
@@ -271,7 +307,59 @@ function addDays(n) {
 }
 
 function jumpTo(item) {
+  pauseTimePlay()
   setDate(beijingDayStartMs(item.y, item.m, item.d) + 12 * 3600 * 1000)
+  const dateStr = `${item.y}-${String(item.m).padStart(2, '0')}-${String(item.d).padStart(2, '0')}`
+  if (route.query.date !== dateStr) {
+    router.replace({ path: '/', query: { ...route.query, date: dateStr } })
+  }
+}
+
+function applyDateFromQuery() {
+  const parsed = parseDateQuery(route.query.date)
+  if (!parsed) return
+  pauseTimePlay()
+  setDate(beijingDayStartMs(parsed.y, parsed.m, parsed.d) + 12 * 3600 * 1000)
+}
+
+function applyStarFromQuery() {
+  const raw = route.query.star
+  if (!raw || typeof raw !== 'string') {
+    starHighlightNames.value = []
+    starFocusHint.value = ''
+    return
+  }
+  const resolved = resolveAsterismName(raw)
+  if (!resolved) {
+    starHighlightNames.value = []
+    starFocusHint.value = `未找到星官「${raw}」，请从列宿页重新选择`
+    return
+  }
+  constellationMode.value = 'east'
+  eastLabels.value = true
+  viewMode.value = 'orbit'
+  starHighlightNames.value = [resolved]
+  starFocusHint.value = `已定位星官：${resolved} · 拖动画面可环顾`
+  nextTick(() => {
+    orbitSceneRef.value?.focusConstellation?.(resolved)
+  })
+}
+
+function dismissStarFocus() {
+  starFocusHint.value = ''
+  starHighlightNames.value = []
+  if (route.query.star) {
+    const nextQuery = { ...route.query }
+    delete nextQuery.star
+    router.replace({ path: '/', query: nextQuery })
+  }
+}
+
+function openCelestialPanel() {
+  lixiangOpen.value = true
+  nextTick(() => {
+    almanacRef.value?.scrollToCelestial?.()
+  })
 }
 
 function toggleLixiang() {
@@ -357,9 +445,30 @@ function onKeydown(e) {
 let desktopMq
 let onBreakpointChange
 
+watch(
+  () => route.query.date,
+  () => {
+    applyDateFromQuery()
+  }
+)
+
+watch(
+  () => route.query.star,
+  () => {
+    applyStarFromQuery()
+  }
+)
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  setDate(Date.now())
+  if (route.query.date) {
+    applyDateFromQuery()
+  } else {
+    setDate(Date.now())
+  }
+  if (route.query.star) {
+    applyStarFromQuery()
+  }
 
   desktopMq = window.matchMedia(DESKTOP_MQ)
   isMobileLayout.value = !desktopMq.matches
@@ -411,6 +520,7 @@ onBeforeUnmount(() => {
       @cycle-speed="cycleTimeSpeed"
       @defaults="goDefaults"
       @add-days="addDays"
+      @open-celestial="openCelestialPanel"
     />
     <button
       v-if="lixiangOpen && isMobileLayout"
@@ -422,6 +532,10 @@ onBeforeUnmount(() => {
     <div v-if="showMobileHint" class="mobile-hint" role="status">
       <p>长按画面后横拖可拨日；顶栏 ‹ › 可换日</p>
       <button type="button" class="mobile-hint-dismiss" @click="dismissMobileHint">知道了</button>
+    </div>
+    <div v-if="starFocusBanner" class="star-focus-banner" role="status">
+      <p>{{ starFocusBanner }}</p>
+      <button type="button" class="star-focus-dismiss" @click="dismissStarFocus">关闭</button>
     </div>
     <main class="stage">
       <OrbitScene
@@ -436,6 +550,7 @@ onBeforeUnmount(() => {
         :observer-lat="observerLat"
         :observer-lon="observerLon"
         :compact-labels="isMobileLayout"
+        :highlight-names="starHighlightNames"
         @scrub="onScrub"
         @culture-open="onCultureOpen"
       />
@@ -459,6 +574,8 @@ onBeforeUnmount(() => {
         :phase-label="phaseLabel"
         :moon-age="moonAge"
         :today-festivals="todayFestivals"
+        :today-celestial-events="todayCelestialEvents"
+        :celestial-hint="activeCelestialHint"
         :y="ymd.y"
         :m="ymd.m"
         :d="ymd.d"
@@ -536,6 +653,44 @@ onBeforeUnmount(() => {
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   padding: 0.38rem 0.85rem;
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+
+.star-focus-banner {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--safe-top) + 3.6rem);
+  z-index: 22;
+  transform: translateX(-50%);
+  width: min(20rem, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
+  padding: 0.55rem 0.7rem 0.48rem;
+  border: 1px solid rgba(184, 150, 74, 0.38);
+  background: rgba(8, 14, 22, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.star-focus-banner p {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  letter-spacing: 0.08em;
+  color: rgba(235, 218, 168, 0.92);
+}
+
+.star-focus-dismiss {
+  appearance: none;
+  margin-top: 0.45rem;
+  border: 1px solid rgba(90, 138, 140, 0.28);
+  background: rgba(14, 22, 32, 0.55);
+  color: rgba(201, 194, 176, 0.75);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  padding: 0.32rem 0.75rem;
   min-height: var(--tap-min);
   cursor: pointer;
 }

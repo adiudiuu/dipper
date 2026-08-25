@@ -1195,6 +1195,24 @@ export function getConstellationByName(name) {
 }
 
 /**
+ * 解析 URL/查询中的星官名（支持「角」→「角宿」等简称）
+ * @param {string} raw
+ * @returns {string | null}
+ */
+export function resolveAsterismName(raw) {
+  if (!raw || typeof raw !== 'string') return null
+  const q = decodeURIComponent(raw.trim())
+  if (!q) return null
+  const exact = CONSTELLATIONS.find((c) => c.name === q)
+  if (exact) return exact.name
+  const withSu = CONSTELLATIONS.find((c) => c.name === `${q}宿`)
+  if (withSu) return withSu.name
+  const starts = CONSTELLATIONS.filter((c) => c.name.startsWith(q))
+  if (starts.length === 1) return starts[0].name
+  return null
+}
+
+/**
  * 行星示意轨道（相对日距已压缩，便于同屏观看）。
  * 方位角 = 日心黄经近似（J2000 平黄经 L0、近日点黄经 ϖ、偏心率 e，按 JD 推进）；
  * 尺度压缩，相对顺序 水→金→地→火→小行星带→木→土→天王→海王→冥王(矮) 正确。

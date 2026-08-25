@@ -1,7 +1,9 @@
 <script setup>
 import { computed, useId } from 'vue'
+import { useRouter } from 'vue-router'
 import { SYNODIC } from '../../lib/calendar.js'
 import { getTodayCultureTip } from '../../lib/cultureTips.js'
+import { getJieqiTopicSlug } from '../../data/jieqiTopics.js'
 
 const props = defineProps({
   currentTerm: { type: String, required: true },
@@ -10,8 +12,14 @@ const props = defineProps({
   phaseFrac: { type: Number, required: true },
   phaseLabel: { type: String, required: true },
   moonAge: { type: Number, required: true },
-  todayFestivals: { type: Array, default: () => [] }
+  todayFestivals: { type: Array, default: () => [] },
+  todayCelestialEvents: { type: Array, default: () => [] },
+  celestialHint: { type: String, default: '' }
 })
+
+const emit = defineEmits(['open-topic'])
+
+const router = useRouter()
 
 const moonUid = useId()
 const moonGradId = computed(() => `${moonUid}-g`)
@@ -45,15 +53,28 @@ const moonLitD = computed(() => {
   const termSweep = f <= 0.5 ? 1 : 0
   return `M ${top} A ${R} ${R} 0 0 0 ${bot} A ${rx} ${R} 0 0 ${termSweep} ${top}`
 })
+
+function openTopic() {
+  const slug = getJieqiTopicSlug(props.currentTerm)
+  if (!slug) return
+  emit('open-topic', props.currentTerm)
+  router.push({ name: 'jieqi-topic', params: { slug } })
+}
 </script>
 
 <template>
   <section class="panel-section">
     <div class="sec-label">节气 · 月相</div>
     <div class="term-line">
-      <span class="term-name">{{ currentTerm }}</span>
+      <button
+        type="button"
+        class="term-name term-link"
+        :title="`阅读 ${currentTerm} 节气科普`"
+        @click="openTopic"
+      >{{ currentTerm }}</button>
       <span class="term-meta">已过 {{ termIntoDays }} 天</span>
     </div>
+    <button type="button" class="topic-link" @click="openTopic">阅读节气专题 ›</button>
     <div class="term-sub">{{ termSub }}</div>
     <div class="phase-row" aria-label="月相">
       <svg
@@ -112,6 +133,21 @@ const moonLitD = computed(() => {
     <div v-if="todayFestivals.length" class="fest-tags">
       <span v-for="f in todayFestivals" :key="f.name" class="mini-tag">{{ f.name }}</span>
     </div>
+    <div v-if="todayCelestialEvents.length" class="celestial-today">
+      <div class="sec-label">当日天象</div>
+      <div
+        v-for="ev in todayCelestialEvents"
+        :key="ev.id"
+        class="celestial-today-row"
+      >
+        <span class="celestial-today-icon" aria-hidden="true">{{ ev.icon }}</span>
+        <span class="celestial-today-text">
+          <span class="celestial-today-name">{{ ev.name }}</span>
+          <span class="celestial-today-kind">{{ ev.typeLabel }}</span>
+        </span>
+      </div>
+      <p v-if="celestialHint" class="celestial-today-hint">{{ celestialHint }}</p>
+    </div>
     <div v-if="cultureTip" class="culture-tip">
       <div class="sec-label">今日小知识</div>
       <div class="tip-title">{{ cultureTip.title }}</div>
@@ -150,6 +186,38 @@ const moonLitD = computed(() => {
   color: var(--jin);
   letter-spacing: 0.16em;
   text-shadow: var(--text-glow);
+}
+
+.term-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.term-link:hover {
+  color: #ebdaa8;
+}
+
+.topic-link {
+  appearance: none;
+  align-self: flex-start;
+  margin-top: 0.12rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: rgba(110, 154, 156, 0.75);
+  cursor: pointer;
+  transition: color 0.18s;
+}
+
+.topic-link:hover {
+  color: var(--jin-mute);
 }
 
 .term-meta {
@@ -245,6 +313,55 @@ const moonLitD = computed(() => {
 
 .fest-tags .mini-tag {
   margin-left: 0;
+}
+
+.celestial-today {
+  margin-top: 0.38rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--rule);
+}
+
+.celestial-today-row {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  margin-top: 0.22rem;
+}
+
+.celestial-today-icon {
+  font-size: 0.78rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.celestial-today-text {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.celestial-today-name {
+  font-family: var(--font-serif);
+  font-size: 0.76rem;
+  color: var(--jin-soft);
+  letter-spacing: 0.1em;
+}
+
+.celestial-today-kind {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--qing-faint);
+  border: 1px solid rgba(110, 154, 156, 0.22);
+  padding: 0.02rem 0.2rem;
+}
+
+.celestial-today-hint {
+  margin: 0.28rem 0 0;
+  font-size: 0.48rem;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: rgba(196, 140, 90, 0.68);
 }
 
 .culture-tip {

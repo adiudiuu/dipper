@@ -4,6 +4,7 @@ import AlmanacSolar from './almanac/AlmanacSolar.vue'
 import AlmanacLunar from './almanac/AlmanacLunar.vue'
 import AlmanacJieqi from './almanac/AlmanacJieqi.vue'
 import FestivalList from './almanac/FestivalList.vue'
+import CelestialEventList from './almanac/CelestialEventList.vue'
 
 defineProps({
   open: { type: Boolean, required: true },
@@ -20,21 +21,28 @@ defineProps({
   phaseLabel: { type: String, required: true },
   moonAge: { type: Number, required: true },
   todayFestivals: { type: Array, default: () => [] },
+  todayCelestialEvents: { type: Array, default: () => [] },
+  celestialHint: { type: String, default: '' },
   y: { type: Number, required: true },
   m: { type: Number, required: true },
   d: { type: Number, required: true }
 })
 
-const emit = defineEmits(['toggle', 'jump', 'panel-wheel'])
+const emit = defineEmits(['toggle', 'jump', 'panel-wheel', 'open-topic'])
 
 const festivalListRef = ref(null)
+const celestialListRef = ref(null)
 
 function resetFestivals() {
   festivalListRef.value?.resetScroll?.()
   festivalListRef.value?.resetUpcoming?.()
 }
 
-defineExpose({ resetFestivals })
+function scrollToCelestial() {
+  celestialListRef.value?.scrollIntoView?.()
+}
+
+defineExpose({ resetFestivals, scrollToCelestial })
 </script>
 
 <template>
@@ -75,8 +83,20 @@ defineExpose({ resetFestivals })
             :phase-label="phaseLabel"
             :moon-age="moonAge"
             :today-festivals="todayFestivals"
+            :today-celestial-events="todayCelestialEvents"
+            :celestial-hint="celestialHint"
+            @open-topic="emit('open-topic', $event)"
           />
         </div>
+
+        <CelestialEventList
+          ref="celestialListRef"
+          :y="y"
+          :m="m"
+          :d="d"
+          @jump="emit('jump', $event)"
+          @panel-wheel="emit('panel-wheel', $event)"
+        />
 
         <FestivalList
           ref="festivalListRef"
