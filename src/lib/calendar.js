@@ -45,6 +45,21 @@ const JIEQI = [
 ];
 const ZHONG_LONS = JIEQI.filter((j) => j.zhong).map((j) => j.lon);
 
+/**
+ * 当地恒星时 Local Sidereal Time（度）
+ * 给定儒略日 JD 与东经 longitudeDeg，返回当地子午线上的春分点时角（度）。
+ * 用于地景视角下天球围绕 Y 轴旋转，使星空与观测者当地时间对齐。
+ * @param {number} jd - 儒略日
+ * @param {number} longitudeDeg - 东经（度），北京 = 116.4
+ * @returns {number} 当地恒星时（度，0-360）
+ */
+export function localSiderealDeg(jd, longitudeDeg) {
+  const T = (jd - 2451545.0) / 36525.0
+  let gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) + T * T * (0.000387933 - T / 38710000.0)
+  gmst = ((gmst % 360) + 360) % 360
+  return ((gmst + longitudeDeg) % 360 + 360) % 360
+}
+
 function norm360(x) {
   x %= 360;
   return x < 0 ? x + 360 : x;
@@ -278,7 +293,23 @@ function hasZhongqiInMonth(shuoDay, nextDay, shuoJD, nextShuoJD) {
   return false;
 }
 
-const lunarCache = new Map();
+const LUNAR_CACHE_MAX = 10
+const lunarCache = new Map()
+const lunarCacheOrder = []
+
+function cacheLunarYear(key, value) {
+  if (lunarCache.has(key)) {
+    // Move to end (most recently used)
+    const idx = lunarCacheOrder.indexOf(key)
+    if (idx !== -1) lunarCacheOrder.splice(idx, 1)
+  } else if (lunarCacheOrder.length >= LUNAR_CACHE_MAX) {
+    const oldest = lunarCacheOrder.shift()
+    lunarCache.delete(oldest)
+  }
+  lunarCache.set(key, value)
+  lunarCacheOrder.push(key)
+  return value
+};
 
 /**
  * 以「公历年 Y 的冬至 → Y+1 冬至」建农历月列。
@@ -355,8 +386,7 @@ function buildLunarYear(dongzhiYear) {
   }
 
   const info = { dongzhiYear, dz0, dz1, months };
-  lunarCache.set(key, info);
-  return info;
+  return cacheLunarYear(key, info)
 }
 
 function civilOfMs(ms) {

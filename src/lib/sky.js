@@ -5,7 +5,6 @@
  * 与历法 JD 联动，不使用随意相位。
  */
 import * as THREE from 'three'
-import { EAST_EXTRA_ASTERISMS } from './eastAsterisms.js'
 import { CONSTELLATION_CULTURE } from './constellationCulture.js'
 
 /** 赤经(时) 赤纬(°) → 天球坐标 */
@@ -1145,7 +1144,6 @@ export const CONSTELLATIONS = [
     lines: [[1, 0], [0, 2]],
     labelAt: 0
   },
-  ...EAST_EXTRA_ASTERISMS
 ]
 
 /** 合并星官文化文案（east-core 等已录入者） */
@@ -1153,6 +1151,23 @@ CONSTELLATIONS.forEach((c) => {
   const culture = CONSTELLATION_CULTURE[c.name]
   if (culture) c.culture = culture
 })
+
+let _extraLoaded = false
+
+/**
+ * 动态加载古象繁（约 283 星官），避免首次加载即解析 2844 行数据。
+ * 只在切换到「古象繁」或「全部」模式时才会被调用。
+ */
+export async function ensureExtraAsterisms() {
+  if (_extraLoaded) return
+  const { EAST_EXTRA_ASTERISMS } = await import('./eastAsterisms.js')
+  for (const a of EAST_EXTRA_ASTERISMS) {
+    const culture = CONSTELLATION_CULTURE[a.name]
+    if (culture) a.culture = culture
+    CONSTELLATIONS.push(a)
+  }
+  _extraLoaded = true
+}
 
 /** 按名称取星官条目（含 culture） */
 export function getConstellationByName(name) {
