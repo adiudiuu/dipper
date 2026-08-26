@@ -26,6 +26,12 @@ const routes = [
     meta: { title: '七政 · 羲和' }
   },
   {
+    path: '/science',
+    name: 'science',
+    component: () => import('../views/ScienceView.vue'),
+    meta: { title: '七政 · 科普' }
+  },
+  {
     path: '/topic/jieqi/:slug',
     name: 'jieqi-topic',
     component: () => import('../views/JieqiTopicView.vue'),

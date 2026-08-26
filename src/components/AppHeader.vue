@@ -50,6 +50,7 @@ const epochText = computed(() => {
 const navItems = [
   { to: '/', label: '历象', title: '历象日月星辰' },
   { to: '/butiange', label: '列宿', title: '列宿认星' },
+  { to: '/science', label: '科普', title: '观象小课' },
   { to: '/timeline', label: '羲和', title: '羲和掌历象' }
 ]
 
@@ -889,7 +890,7 @@ onUnmounted(() => {
     min-width: 0;
     gap: 0.28rem;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .nav-link {
@@ -899,7 +900,7 @@ onUnmounted(() => {
     max-width: none;
     padding: 0 0.2rem;
     font-size: 0.62rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: clip;
