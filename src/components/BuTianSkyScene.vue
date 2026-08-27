@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
 import { getBuTianGeAsterismNames } from '../lib/buTianGe.js'
+import { FOUR_ANIMALS } from '../lib/fourAnimals.js'
 import {
   CONSTELLATIONS,
   ensureExtraAsterisms,
@@ -21,7 +22,9 @@ const props = defineProps({
   /** 是否显示星名（西象/古象当前层均生效） */
   showLabels: { type: Boolean, default: true },
   /** 星象层：west 西象 | east 古象（全量）| all 两层同显 */
-  constellationMode: { type: String, default: 'east' }
+  constellationMode: { type: String, default: 'east' },
+  /** 四象拆解：激活的象 id（'' 为关闭）；在古象/全部层可见 */
+  activeQuad: { type: String, default: '' }
 })
 
 /** 歌诀引用到的东象名：用于优先贴名（全量仍挂载） */
@@ -55,6 +58,10 @@ let focusTarget = new THREE.Vector3(0, 0, 0)
 let desiredFocus = new THREE.Vector3(0, 0, 0)
 let eastGroup = null
 let westGroup = null
+/** 四象拆解覆盖层：兽形连线 + 部位/象名标签 */
+let quadGroup = null
+/** @type {Map<string, { line: THREE.Line, labels: import('three/examples/jsm/renderers/CSS2DRenderer.js').CSS2DObject[] }>} */
+const quadMap = new Map()
 
 function makeSkyInscribe(name) {
   const el = document.createElement('div')
@@ -208,6 +215,99 @@ function buildAsterisms(parent, layer) {
   })
 }
 
+/** 四象部位/象名标签：CSS2D，沿圆周推出一段，着色走 --quad-color */
+function makeQuadLabel(className, content, position, quadColor) {
+  const el = document.createElement('div')
+  el.className = className
+  el.innerHTML = content || ''
+  el.style.setProperty('--quad-color', quadColor)
+  const obj = new CSS2DObject(el)
+  obj.position.copy(position)
+  return obj
+}
+
+/**
+ * 为某一象建覆盖层：CatmullRom 曲线穿过 7 宿中心勾勒兽形，
+ * 每宿旁放「部位·宿名」标签，质心放象名标签。
+ * 7 宿必须全部已挂载（constellationMap），否则返回 null。
+ */
+function buildAnimalOverlay(animal) {
+  const entryList = animal.mansions.map((m) => constellationMap.get(m.name))
+  if (entryList.some((e) => !e)) return null
+  const base = entryList.map((e) => e.center.clone().normalize().multiplyScalar(SKY_R))
+  const color = new THREE.Color(animal.color)
+
+  const curve = new THREE.CatmullRomCurve3(base, false, 'catmullrom', 0.5)
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(
+    curve
+      .getPoints(80)
+      .map((p) => p.clone().normalize().multiplyScalar(SKY_R + 0.6))
+  )
+  const line = new THREE.Line(
+    lineGeo,
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      fog: false
+    })
+  )
+  line.renderOrder = -1
+
+  const labels = entryList.map((e, i) => {
+    const p = e.center.clone().normalize().multiplyScalar(SKY_R * 1.02)
+    return makeQuadLabel(
+      'quad-part',
+      `<b>${animal.mansions[i].part}</b><i>${animal.mansions[i].name.replace('宿', '')}</i>`,
+      p,
+      animal.color
+    )
+  })
+
+  const cen = new THREE.Vector3()
+  base.forEach((p) => cen.add(p))
+  cen
+    .divideScalar(base.length)
+    .normalize()
+    .multiplyScalar(SKY_R * 1.02)
+  labels.push(makeQuadLabel('quad-title', animal.name, cen, animal.color))
+
+  return { line, labels }
+}
+
+/** 四象覆盖层一次性构建（east/all 就绪后调用，幂等） */
+function buildQuadOverlays() {
+  if (!quadGroup) {
+    quadGroup = new THREE.Group()
+    quadGroup.renderOrder = -1
+    scene.add(quadGroup)
+  }
+  FOUR_ANIMALS.forEach((animal) => {
+    if (quadMap.has(animal.id)) return
+    const o = buildAnimalOverlay(animal)
+    if (!o) return
+    quadGroup.add(o.line)
+    o.labels.forEach((l) => quadGroup.add(l))
+    quadMap.set(animal.id, o)
+  })
+}
+
+/** 按「是否激活该象 + 东象层是否可见」控制覆盖层显隐 */
+function applyQuadVisibility() {
+  if (!quadGroup) return
+  const mode = props.constellationMode || 'east'
+  const eastVisible = mode === 'east' || mode === 'all'
+  const active = props.activeQuad
+  quadGroup.visible = eastVisible && !!active
+  quadMap.forEach((o, id) => {
+    o.line.visible = eastVisible && active === id
+    o.labels.forEach((l) => {
+      l.visible = eastVisible && active === id
+    })
+  })
+}
+
 function layerVisible(entryLayer, mode) {
   if (mode === 'all') return true
   return entryLayer === mode
@@ -217,6 +317,7 @@ function applyLayerVisibility() {
   const mode = props.constellationMode || 'east'
   if (eastGroup) eastGroup.visible = mode === 'east' || mode === 'all'
   if (westGroup) westGroup.visible = mode === 'west' || mode === 'all'
+  applyQuadVisibility()
 }
 
 function applyHighlight() {
@@ -249,8 +350,10 @@ function applyHighlight() {
     entry.halos.forEach((m) => applyMaterialOpacity(m, haloOp))
     entry.lines.forEach((l) => applyMaterialOpacity(l, lineOp))
     if (entry.label) {
-      entry.label.visible = props.showLabels && (isPrimary || active)
-      setLabelHighlight(entry.label, active, dimmed && isPrimary)
+      // 四象拆解激活时，隐藏该象宿名的常规星名，让部位标签单独说话
+      const suppressDim = active && !!props.activeQuad
+      entry.label.visible = props.showLabels && (isPrimary || active) && !suppressDim
+      setLabelHighlight(entry.label, active && !suppressDim, dimmed && isPrimary)
     }
   })
 
@@ -386,8 +489,10 @@ onMounted(async () => {
   buildAsterisms(eastGroup, 'east')
   await ensureEastLayerReady()
   if (!mountedAlive) return
+  buildQuadOverlays()
   applyLayerVisibility()
   applyHighlight()
+  applyQuadVisibility()
 
   ro = new ResizeObserver(resize)
   ro.observe(host.value)
@@ -424,6 +529,8 @@ onBeforeUnmount(() => {
   renderer?.dispose()
   renderer = null
   constellationMap.clear()
+  quadMap.clear()
+  quadGroup = null
   eastGroup = null
   westGroup = null
 })
@@ -436,6 +543,9 @@ watch(() => props.constellationMode, async () => {
   await ensureEastLayerReady()
   applyLayerVisibility()
   applyHighlight()
+})
+watch(() => props.activeQuad, () => {
+  applyQuadVisibility()
 })
 </script>
 
@@ -507,6 +617,67 @@ watch(() => props.constellationMode, async () => {
 .butian-labels .sky-inscribe.is-clickable:focus-visible {
   color: rgba(235, 218, 168, 0.98);
   outline: none;
+}
+
+/* 四象拆解：部位标签 + 象名标签 */
+.butian-labels .quad-part,
+.butian-labels .quad-title {
+  pointer-events: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  white-space: nowrap;
+}
+
+.butian-labels .quad-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  color: var(--quad-color, #d0b48a);
+  text-shadow: 0 1px 2px rgba(6, 10, 16, 0.6);
+  text-align: center;
+}
+
+.butian-labels .quad-part b {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+}
+
+.butian-labels .quad-part i {
+  font-style: normal;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-indent: 0.12em;
+  opacity: 0.82;
+}
+
+.butian-labels .quad-title {
+  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  color: var(--quad-color, #d0b48a);
+  text-shadow:
+    0 0 10px rgba(6, 10, 16, 0.5),
+    0 1px 2px rgba(6, 10, 16, 0.6);
+}
+
+@media (max-width: 720px) {
+  .butian-labels .quad-part b {
+    font-size: 10.5px;
+  }
+  .butian-labels .quad-part i {
+    font-size: 7.5px;
+  }
+  .butian-labels .quad-title {
+    font-size: 13px;
+    letter-spacing: 0.32em;
+  }
 }
 
 @media (max-width: 720px) {

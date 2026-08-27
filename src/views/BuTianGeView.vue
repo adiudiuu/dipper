@@ -4,6 +4,7 @@ import AppHeader from '../components/AppHeader.vue'
 import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import BuTianSkyScene from '../components/BuTianSkyScene.vue'
 import CultureCard from '../components/CultureCard.vue'
+import StarBioCard from '../components/StarBioCard.vue'
 import {
   BU_TIAN_GE_LINES,
   BU_TIAN_GE_SECTIONS,
@@ -11,6 +12,8 @@ import {
   getConstellationsForLine
 } from '../lib/buTianGe.js'
 import { CONSTELLATIONS } from '../lib/sky.js'
+import { STAR_BIOS } from '../lib/starBiographies.js'
+import { FOUR_ANIMALS } from '../lib/fourAnimals.js'
 
 const SKY_MODES = [
   { id: 'west', label: '西象' },
@@ -24,6 +27,7 @@ const westActiveName = ref('')
 const lyricsRef = ref(null)
 const lineRefs = ref([])
 const westItemRefs = ref({})
+const bioCardRefs = ref({})
 const showLabels = ref(true)
 const cultureOpen = ref(false)
 const cultureName = ref('')
@@ -31,6 +35,11 @@ const cultureData = ref(null)
 const scrollSyncLock = ref(false)
 /** 全部模式下最近一次点选侧：east | west */
 const focusSide = ref('east')
+/** 四象拆解：当前激活的象 id（'' = 关闭） */
+const activeAnimalId = ref('')
+/** 明星小传：当前点亮的小传 id 与展开 id */
+const activeBioId = ref('')
+const expandedBioId = ref('')
 
 const MOBILE_MQ = '(max-width: 720px)'
 const isMobileLayout = ref(typeof window !== 'undefined' && window.matchMedia(MOBILE_MQ).matches)
@@ -62,7 +71,22 @@ const westStats = computed(() => {
 
 const activeLine = computed(() => BU_TIAN_GE_LINES[activeIndex.value] ?? null)
 
+const activeAnimal = computed(
+  () => FOUR_ANIMALS.find((a) => a.id === activeAnimalId.value) ?? null
+)
+const activeBio = computed(
+  () => STAR_BIOS.find((b) => b.id === activeBioId.value) ?? null
+)
+
 const highlightNames = computed(() => {
+  // 四象拆解：点亮所选象的七宿（最高优先）
+  if (activeAnimal.value) {
+    return activeAnimal.value.mansions.map((m) => m.name)
+  }
+  // 明星小传：点亮传主相关星
+  if (activeBio.value) {
+    return activeBio.value.highlight
+  }
   const mode = constellationMode.value
   if (mode === 'west') {
     return westActiveName.value ? [westActiveName.value] : []
@@ -78,6 +102,20 @@ const highlightNames = computed(() => {
 })
 
 const skyCaption = computed(() => {
+  // 四象拆解：按体序展示「部位·宿」
+  if (activeAnimal.value) {
+    const seq = activeAnimal.value.mansions
+      .map((m) => `${m.part}·${m.name.replace('宿', '')}`)
+      .join(' ')
+    return { badge: `四象 · ${activeAnimal.value.name}`, names: seq }
+  }
+  // 明星小传：展示传主及点亮星
+  if (activeBio.value) {
+    return {
+      badge: '明星小传',
+      names: `${activeBio.value.title} · ${activeBio.value.highlight.join(' / ')}`
+    }
+  }
   const mode = constellationMode.value
   if (mode === 'west' || (mode === 'all' && focusSide.value === 'west')) {
     if (!westActiveName.value) {
@@ -137,11 +175,18 @@ function setWestItemRef(el, name) {
   westItemRefs.value[name] = el
 }
 
+function setBioCardRef(el, id) {
+  if (el) bioCardRefs.value[id] = el
+}
+
 function selectLine(flatIndex, scrollIntoView = true) {
   if (flatIndex < 0 || flatIndex >= BU_TIAN_GE_LINES.length) return
   activeIndex.value = flatIndex
   focusSide.value = 'east'
   westActiveName.value = ''
+  activeAnimalId.value = ''
+  activeBioId.value = ''
+  expandedBioId.value = ''
   if (scrollIntoView) {
     scrollSyncLock.value = true
     nextTick(() => {
@@ -158,6 +203,9 @@ function selectWest(name, scrollIntoView = true) {
   const next = westActiveName.value === name ? '' : name
   westActiveName.value = next
   focusSide.value = 'west'
+  activeAnimalId.value = ''
+  activeBioId.value = ''
+  expandedBioId.value = ''
   if (scrollIntoView && westActiveName.value) {
     nextTick(() => {
       westItemRefs.value[name]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -187,6 +235,51 @@ function stepWest(delta) {
   })
 }
 
+function focusAnimal(id) {
+  activeAnimalId.value = activeAnimalId.value === id ? '' : id
+  activeBioId.value = ''
+  expandedBioId.value = ''
+  westActiveName.value = ''
+  if (activeAnimalId.value && constellationMode.value === 'west') {
+    constellationMode.value = 'east'
+  }
+  focusSide.value = 'east'
+}
+
+/** 四象按钮激活态配色（hex + 透明度后缀，由数据色驱动） */
+function animalStyle(animal) {
+  if (activeAnimalId.value !== animal.id) return undefined
+  return {
+    color: animal.color,
+    borderColor: `${animal.color}99`,
+    background: `${animal.color}1a`
+  }
+}
+
+function focusBio(id) {
+  if (activeBioId.value === id) {
+    activeBioId.value = ''
+    expandedBioId.value = ''
+  } else {
+    activeBioId.value = id
+    expandedBioId.value = id
+    activeAnimalId.value = ''
+    westActiveName.value = ''
+    if (constellationMode.value === 'west') {
+      constellationMode.value = 'east'
+    }
+    nextTick(() => {
+      bioCardRefs.value[id]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }
+  focusSide.value = 'east'
+}
+
+/** 仅收起小传正文（星仍高亮） */
+function collapseBio() {
+  expandedBioId.value = ''
+}
+
 function onCultureOpen(payload) {
   cultureName.value = payload.name
   cultureData.value = payload.culture
@@ -198,8 +291,14 @@ function closeCulture() {
 }
 
 watch(constellationMode, (mode) => {
-  if (mode === 'west') focusSide.value = 'west'
-  else if (mode === 'east') focusSide.value = 'east'
+  if (mode === 'west') {
+    focusSide.value = 'west'
+    activeAnimalId.value = ''
+    activeBioId.value = ''
+    expandedBioId.value = ''
+  } else if (mode === 'east') {
+    focusSide.value = 'east'
+  }
 })
 
 watch(showEastPanel, (show) => {
@@ -225,6 +324,8 @@ onMounted(() => {
     (entries) => {
       if (scrollSyncLock.value || !showEastPanel.value) return
       if (isAllMode.value && focusSide.value === 'west') return
+      // 小传 / 四象激活时，不让布局位移或滚动改劫高亮
+      if (activeAnimalId.value || activeBioId.value) return
       const visible = entries
         .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.55)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
@@ -234,6 +335,9 @@ onMounted(() => {
         activeIndex.value = idx
         focusSide.value = 'east'
         westActiveName.value = ''
+        activeAnimalId.value = ''
+        activeBioId.value = ''
+        expandedBioId.value = ''
       }
     },
     {
@@ -303,11 +407,31 @@ onBeforeUnmount(() => {
           :constellation-mode="constellationMode"
           :highlight-names="highlightNames"
           :show-labels="showLabels"
+          :active-quad="activeAnimalId"
           @constellation-click="onCultureOpen"
         />
         <div v-if="skyCaption" class="sky-caption glass-caption">
           <span class="cap-badge">{{ skyCaption.badge }}</span>
           <span class="cap-names">{{ skyCaption.names }}</span>
+        </div>
+        <div
+          v-if="constellationMode !== 'west'"
+          class="quad-tool glass-caption"
+          role="group"
+          aria-label="四象拆解：点亮七宿并勾勒兽形"
+        >
+          <span class="quad-tool-label">四象</span>
+          <button
+            v-for="animal in FOUR_ANIMALS"
+            :key="animal.id"
+            type="button"
+            class="quad-tool-btn"
+            :class="{ active: activeAnimalId === animal.id }"
+            :aria-pressed="activeAnimalId === animal.id"
+            :style="animalStyle(animal)"
+            :title="`${animal.name} · 点亮其七宿并勾勒兽形`"
+            @click="focusAnimal(animal.id)"
+          >{{ animal.name }}</button>
         </div>
       </section>
 
@@ -378,6 +502,24 @@ onBeforeUnmount(() => {
         </div>
 
         <div ref="lyricsRef" class="lyrics-scroll">
+          <!-- 明星小传：4 位登录星 -->
+          <article v-if="showEastPanel" class="lyrics-section bio-section">
+            <header class="section-head">
+              <h2 class="section-title">明星小传</h2>
+              <span class="section-sub">点击点亮并展开 · 观象授时的恒星课</span>
+            </header>
+            <StarBioCard
+              v-for="bio in STAR_BIOS"
+              :key="bio.id"
+              :ref="(el) => setBioCardRef(el, bio.id)"
+              :bio="bio"
+              :active="activeBioId === bio.id"
+              :expanded="expandedBioId === bio.id"
+              @click-bio="focusBio"
+              @collapse="collapseBio"
+            />
+          </article>
+
           <!-- 古象：步天歌 -->
           <template v-if="showEastPanel">
             <article
@@ -525,6 +667,56 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(90, 138, 140, 0.22);
   background: rgba(8, 14, 22, 0.72);
   backdrop-filter: blur(8px);
+}
+
+/* —— 四象拆解浮标 —— */
+.quad-tool {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.65rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: min(92%, 26rem);
+  padding: 0.32rem 0.42rem;
+  border-radius: 0.4rem;
+}
+
+.quad-tool-label {
+  flex: 0 0 auto;
+  margin-right: 0.1rem;
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  color: rgba(110, 154, 156, 0.85);
+}
+
+.quad-tool-btn {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1px solid rgba(90, 138, 140, 0.3);
+  border-radius: 0.3rem;
+  background: rgba(8, 14, 22, 0.45);
+  color: rgba(201, 194, 176, 0.62);
+  font-family: var(--font-serif);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  padding: 0.26rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quad-tool-btn:hover {
+  color: #ebdaa8;
+  border-color: rgba(196, 164, 90, 0.5);
+}
+
+/* —— 明星小传区块 —— */
+.bio-section {
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(90, 138, 140, 0.14);
 }
 
 .cap-badge {
@@ -839,6 +1031,20 @@ onBeforeUnmount(() => {
     right: 0.45rem;
     bottom: 0.45rem;
     max-width: none;
+  }
+
+  /* 窄屏：四象浮标移到顶部，避免与底部全宽角标重叠 */
+  .quad-tool {
+    right: 0.45rem;
+    bottom: auto;
+    top: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: calc(100% - 0.9rem);
+  }
+
+  .quad-tool-btn {
+    padding: 0.2rem 0.45rem;
   }
 }
 
