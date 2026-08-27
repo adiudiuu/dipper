@@ -271,7 +271,14 @@ function buildAnimalOverlay(animal) {
     .divideScalar(base.length)
     .normalize()
     .multiplyScalar(SKY_R * 1.02)
-  labels.push(makeQuadLabel('quad-title', animal.name, cen, animal.color))
+  labels.push(
+    makeQuadLabel(
+      'quad-title',
+      `<span class="quad-title-dir">${animal.direction}方</span>${animal.name}`,
+      cen,
+      animal.color
+    )
+  )
 
   return { line, labels }
 }
@@ -656,6 +663,10 @@ watch(() => props.activeQuad, () => {
 }
 
 .butian-labels .quad-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   font-family: 'Noto Serif SC', 'Songti SC', serif;
   font-size: 15px;
   font-weight: 600;
@@ -665,6 +676,15 @@ watch(() => props.activeQuad, () => {
   text-shadow:
     0 0 10px rgba(6, 10, 16, 0.5),
     0 1px 2px rgba(6, 10, 16, 0.6);
+}
+
+.butian-labels .quad-title .quad-title-dir {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  opacity: 0.82;
 }
 
 @media (max-width: 720px) {

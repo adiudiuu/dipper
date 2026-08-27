@@ -47,7 +47,16 @@ describe('四象拆解 · 数据完整性', () => {
     FOUR_ANIMALS.forEach((a) => {
       expect(a.mansions?.length, a.name).toBe(7)
       expect(a.color, a.name).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(a.direction, a.name).toMatch(/^[东南西北]$/)
+      expect(a.season, a.name).toMatch(/^[春夏秋冬]$/)
+      expect(a.element, a.name).toMatch(/^[木火土金水]$/)
     })
+  })
+
+  it('四象方位各一，不重不漏', () => {
+    const dirs = FOUR_ANIMALS.map((a) => a.direction)
+    expect(new Set(dirs).size).toBe(4)
+    expect(new Set(dirs)).toEqual(new Set(['东', '南', '西', '北']))
   })
 
   it('与 constellationCulture 有文化文案的宿保持一致（口径内核）', () => {

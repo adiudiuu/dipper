@@ -12,6 +12,9 @@
  * @typedef {{
  *   id: string,
  *   name: string,
+ *   direction: string,
+ *   season: string,
+ *   element: string,
  *   color: string,
  *   mansions: Array<{ name: string, part: string }>
  * }} FourAnimal
@@ -22,6 +25,9 @@ export const FOUR_ANIMALS = [
   {
     id: 'qinglong',
     name: '青龙',
+    direction: '东',
+    season: '春',
+    element: '木',
     color: '#5e9c78',
     mansions: [
       { name: '角宿', part: '角' },
@@ -36,6 +42,9 @@ export const FOUR_ANIMALS = [
   {
     id: 'xuanwu',
     name: '玄武',
+    direction: '北',
+    season: '冬',
+    element: '水',
     color: '#5d8fb0',
     mansions: [
       { name: '斗宿', part: '蛇首' },
@@ -50,6 +59,9 @@ export const FOUR_ANIMALS = [
   {
     id: 'baihu',
     name: '白虎',
+    direction: '西',
+    season: '秋',
+    element: '金',
     color: '#d8c9a4',
     mansions: [
       { name: '奎宿', part: '尾' },
@@ -64,6 +76,9 @@ export const FOUR_ANIMALS = [
   {
     id: 'zhuque',
     name: '朱雀',
+    direction: '南',
+    season: '夏',
+    element: '火',
     color: '#d07a5a',
     mansions: [
       { name: '井宿', part: '首' },

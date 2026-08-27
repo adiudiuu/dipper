@@ -5,6 +5,7 @@ import SpaceBackdrop from '../components/SpaceBackdrop.vue'
 import BuTianSkyScene from '../components/BuTianSkyScene.vue'
 import CultureCard from '../components/CultureCard.vue'
 import StarBioCard from '../components/StarBioCard.vue'
+import FourAnimalsCompass from '../components/FourAnimalsCompass.vue'
 import {
   BU_TIAN_GE_LINES,
   BU_TIAN_GE_SECTIONS,
@@ -102,12 +103,16 @@ const highlightNames = computed(() => {
 })
 
 const skyCaption = computed(() => {
-  // 四象拆解：按体序展示「部位·宿」
+  // 四象拆解：按体序展示「部位·宿」链
   if (activeAnimal.value) {
-    const seq = activeAnimal.value.mansions
-      .map((m) => `${m.part}·${m.name.replace('宿', '')}`)
-      .join(' ')
-    return { badge: `四象 · ${activeAnimal.value.name}`, names: seq }
+    return {
+      badge: `四象 · ${activeAnimal.value.name}`,
+      meta: `${activeAnimal.value.direction}方 · ${activeAnimal.value.season}季 · ${activeAnimal.value.element}`,
+      bodyChain: activeAnimal.value.mansions.map((m) => ({
+        part: m.part,
+        mansion: m.name.replace('宿', '')
+      }))
+    }
   }
   // 明星小传：展示传主及点亮星
   if (activeBio.value) {
@@ -236,7 +241,7 @@ function stepWest(delta) {
 }
 
 function focusAnimal(id) {
-  activeAnimalId.value = activeAnimalId.value === id ? '' : id
+  activeAnimalId.value = id
   activeBioId.value = ''
   expandedBioId.value = ''
   westActiveName.value = ''
@@ -244,16 +249,6 @@ function focusAnimal(id) {
     constellationMode.value = 'east'
   }
   focusSide.value = 'east'
-}
-
-/** 四象按钮激活态配色（hex + 透明度后缀，由数据色驱动） */
-function animalStyle(animal) {
-  if (activeAnimalId.value !== animal.id) return undefined
-  return {
-    color: animal.color,
-    borderColor: `${animal.color}99`,
-    background: `${animal.color}1a`
-  }
 }
 
 function focusBio(id) {
@@ -411,28 +406,26 @@ onBeforeUnmount(() => {
           @constellation-click="onCultureOpen"
         />
         <div v-if="skyCaption" class="sky-caption glass-caption">
-          <span class="cap-badge">{{ skyCaption.badge }}</span>
-          <span class="cap-names">{{ skyCaption.names }}</span>
+          <div class="cap-head">
+            <span class="cap-badge">{{ skyCaption.badge }}</span>
+            <span v-if="skyCaption.meta" class="cap-meta">{{ skyCaption.meta }}</span>
+          </div>
+          <div v-if="skyCaption.bodyChain" class="cap-body-chain" aria-label="七宿体序">
+            <template v-for="(node, i) in skyCaption.bodyChain" :key="node.mansion">
+              <span class="body-node" :style="{ '--node-color': activeAnimal?.color }">
+                <span class="body-part">{{ node.part }}</span>
+                <span class="body-mansion">{{ node.mansion }}</span>
+              </span>
+              <span v-if="i < skyCaption.bodyChain.length - 1" class="body-arrow" aria-hidden="true">→</span>
+            </template>
+          </div>
+          <span v-else-if="skyCaption.names" class="cap-names">{{ skyCaption.names }}</span>
         </div>
-        <div
+        <FourAnimalsCompass
           v-if="constellationMode !== 'west'"
-          class="quad-tool glass-caption"
-          role="group"
-          aria-label="四象拆解：点亮七宿并勾勒兽形"
-        >
-          <span class="quad-tool-label">四象</span>
-          <button
-            v-for="animal in FOUR_ANIMALS"
-            :key="animal.id"
-            type="button"
-            class="quad-tool-btn"
-            :class="{ active: activeAnimalId === animal.id }"
-            :aria-pressed="activeAnimalId === animal.id"
-            :style="animalStyle(animal)"
-            :title="`${animal.name} · 点亮其七宿并勾勒兽形`"
-            @click="focusAnimal(animal.id)"
-          >{{ animal.name }}</button>
-        </div>
+          :active-id="activeAnimalId"
+          @select="focusAnimal"
+        />
       </section>
 
       <section
@@ -654,13 +647,65 @@ onBeforeUnmount(() => {
   bottom: 0.65rem;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.45rem 0.65rem;
-  max-width: min(92%, 28rem);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-width: min(72%, 22rem);
   padding: 0.4rem 0.65rem;
   border-radius: 0.4rem;
   pointer-events: none;
+}
+
+.cap-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+}
+
+.cap-meta {
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: rgba(110, 154, 156, 0.75);
+}
+
+.cap-body-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.12rem 0.08rem;
+}
+
+.body-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.02rem;
+  padding: 0.14rem 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--node-color, #5e9c78) 45%, transparent);
+  border-radius: 0.28rem;
+  background: color-mix(in srgb, var(--node-color, #5e9c78) 12%, rgba(8, 14, 22, 0.6));
+}
+
+.body-part {
+  font-family: var(--font-serif);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  color: var(--node-color, #ebdaa8);
+  line-height: 1.1;
+}
+
+.body-mansion {
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  color: rgba(201, 194, 176, 0.62);
+}
+
+.body-arrow {
+  font-size: 0.52rem;
+  color: rgba(110, 154, 156, 0.55);
+  margin: 0 0.02rem;
 }
 
 .glass-caption {
@@ -669,47 +714,10 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
 }
 
-/* —— 四象拆解浮标 —— */
-.quad-tool {
-  position: absolute;
-  right: 0.65rem;
-  bottom: 0.65rem;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  max-width: min(92%, 26rem);
-  padding: 0.32rem 0.42rem;
-  border-radius: 0.4rem;
-}
-
-.quad-tool-label {
-  flex: 0 0 auto;
-  margin-right: 0.1rem;
+.cap-badge {
   font-size: 0.52rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   color: rgba(110, 154, 156, 0.85);
-}
-
-.quad-tool-btn {
-  appearance: none;
-  flex: 0 0 auto;
-  border: 1px solid rgba(90, 138, 140, 0.3);
-  border-radius: 0.3rem;
-  background: rgba(8, 14, 22, 0.45);
-  color: rgba(201, 194, 176, 0.62);
-  font-family: var(--font-serif);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
-  padding: 0.26rem 0.5rem;
-  cursor: pointer;
-  transition: color 0.18s, border-color 0.18s, background 0.18s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.quad-tool-btn:hover {
-  color: #ebdaa8;
-  border-color: rgba(196, 164, 90, 0.5);
 }
 
 /* —— 明星小传区块 —— */
@@ -717,12 +725,6 @@ onBeforeUnmount(() => {
   margin-bottom: 0.55rem;
   padding-bottom: 0.55rem;
   border-bottom: 1px solid rgba(90, 138, 140, 0.14);
-}
-
-.cap-badge {
-  font-size: 0.52rem;
-  letter-spacing: 0.16em;
-  color: rgba(110, 154, 156, 0.85);
 }
 
 .cap-names {
@@ -1028,23 +1030,17 @@ onBeforeUnmount(() => {
 
   .sky-caption {
     left: 0.45rem;
-    right: 0.45rem;
+    right: auto;
     bottom: 0.45rem;
-    max-width: none;
+    max-width: calc(100% - 9.5rem);
   }
 
-  /* 窄屏：四象浮标移到顶部，避免与底部全宽角标重叠 */
-  .quad-tool {
-    right: 0.45rem;
-    bottom: auto;
-    top: 0.45rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: calc(100% - 0.9rem);
+  .body-node {
+    padding: 0.1rem 0.22rem;
   }
 
-  .quad-tool-btn {
-    padding: 0.2rem 0.45rem;
+  .body-part {
+    font-size: 0.52rem;
   }
 }
 
